@@ -17,6 +17,51 @@ globalThis.MACRO = {
   ISSUES_EXPLAINER: 'visit https://github.com/anthropics/claude-code/issues',
 }
 
+// Patch Commander.js to tolerate non-standard short flags like '-d2e'.
+// The original source uses '-d2e, --debug-to-stderr' which Commander >= 12
+// rejects at runtime (short flags must be exactly one letter after '-').
+//
+// Strategy: directly rewrite commander/lib/option.js on disk before it is
+// ever require()d. We use a sentinel comment to make the patch idempotent so
+// repeated runs (e.g. bun watch) don't corrupt the file. The file is written
+// back synchronously so that the module loader sees the patched version.
+//
+// Note: we cannot use Bun.plugin onLoad for this because Bun's plugin system
+// marks any module intercepted by onLoad as an ESM namespace object, which
+// breaks commander's CJS require() chain (exports.Option becomes undefined).
+;(() => {
+  const fs = require('fs') as typeof import('fs')
+  const path = require('path') as typeof import('path')
+  const optionPath = path.resolve(
+    __dirname,
+    '../node_modules/commander/lib/option.js',
+  )
+  try {
+    const src = fs.readFileSync(optionPath, 'utf8')
+    if (!src.includes('__CLAUDE_CODE_SHIM__')) {
+      const patched = src.replace(
+        'function splitOptionFlags(flags) {',
+        `function splitOptionFlags(flags) {
+  // __CLAUDE_CODE_SHIM__: Strip non-standard short flags (multi-char after '-')
+  // before Commander validates them. Required because the source uses the token
+  // '-d2e, --debug-to-stderr' which Commander >= 12 otherwise rejects.
+  flags = flags.split(/[ |,]+/).filter(function(f) {
+    if (f.startsWith('--')) return true;        // long flag -- keep
+    if (/^-[a-zA-Z]$/.test(f)) return true;    // valid short flag -- keep
+    if (f.startsWith('-')) return false;         // invalid short flag (e.g. -d2e) -- strip
+    return true;                                 // value placeholder (<x>, [x]) -- keep
+  }).join(', ');`,
+      )
+      if (patched !== src) {
+        fs.writeFileSync(optionPath, patched, 'utf8')
+      }
+    }
+  } catch (_) {
+    // If patching fails (e.g. read-only fs), continue — the CLI will throw at
+    // Option construction time with a clear error from Commander.
+  }
+})()
+
 Bun.plugin({
   name: 'bun-bundle-shim',
   setup(build) {
