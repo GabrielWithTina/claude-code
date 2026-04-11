@@ -84,8 +84,10 @@ export function initializeRemoteManagedSettingsLoadingPromise(): void {
       loadingCompleteResolve = resolve
 
       // Set a timeout to resolve the promise even if loadRemoteManagedSettings() is never called
-      // This prevents deadlocks in Agent SDK tests and other non-CLI contexts
-      setTimeout(() => {
+      // This prevents deadlocks in Agent SDK tests and other non-CLI contexts.
+      // Unreffed so it doesn't keep the event loop alive if all real work is done —
+      // without unref(), the process hangs for the full 30 s even when idle.
+      const timeoutId = setTimeout(() => {
         if (loadingCompleteResolve) {
           logForDebugging(
             'Remote settings: Loading promise timed out, resolving anyway',
@@ -94,6 +96,7 @@ export function initializeRemoteManagedSettingsLoadingPromise(): void {
           loadingCompleteResolve = null
         }
       }, LOADING_PROMISE_TIMEOUT_MS)
+      timeoutId.unref?.()
     })
   }
 }
