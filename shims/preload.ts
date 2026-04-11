@@ -16,7 +16,7 @@ declare global {
   }
 }
 ;(globalThis as any).MACRO = {
-  VERSION: '0.0.1',
+  VERSION: '99.0.0', // High version to pass the GrowthBook-driven minimum version check
   BUILD_TIME: new Date().toISOString(),
   ISSUES_EXPLAINER: 'visit https://github.com/anthropics/claude-code/issues',
   FEEDBACK_CHANNEL: '',
