@@ -2,6 +2,14 @@
 // Runs before main.tsx via bunfig.toml preload.
 // Shims compile-time Bun modules and internal @ant/* packages that are not on npm.
 
+// Disable telemetry/analytics so GrowthBook skips its blocking HTTP init call.
+// Without this, getDynamicConfig_BLOCKS_ON_INIT → initializeGrowthBook() →
+// thisClient.init({ timeout: 5000 }) makes a network request that hangs startup
+// when no GrowthBook endpoint is reachable.
+// DISABLE_TELEMETRY=1 triggers the 'no-telemetry' privacy level, which causes
+// isGrowthBookEnabled() to return false and all feature flags to return defaults.
+process.env.DISABLE_TELEMETRY = '1'
+
 // MACRO is inlined at bundle/compile time by the Bun bundler.
 // At runtime (bun run), we define it as a global with sensible defaults.
 declare global {

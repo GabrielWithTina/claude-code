@@ -90,7 +90,7 @@ Two resolution problems solved:
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": false,
+    "strict": false,  // source wasn't written for external type-checking; strict=true causes hundreds of errors
     "jsx": "react-jsx",
     "paths": {
       "src/*": ["./*"]
