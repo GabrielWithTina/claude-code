@@ -9,12 +9,20 @@ declare global {
     VERSION: string
     BUILD_TIME: string
     ISSUES_EXPLAINER: string
+    FEEDBACK_CHANNEL: string
+    PACKAGE_URL: string
+    NATIVE_PACKAGE_URL: string
+    VERSION_CHANGELOG: string
   }
 }
-globalThis.MACRO = {
+;(globalThis as any).MACRO = {
   VERSION: '0.0.1',
-  BUILD_TIME: '',
+  BUILD_TIME: new Date().toISOString(),
   ISSUES_EXPLAINER: 'visit https://github.com/anthropics/claude-code/issues',
+  FEEDBACK_CHANNEL: '',
+  PACKAGE_URL: '@anthropic-ai/claude-code',
+  NATIVE_PACKAGE_URL: '@anthropic-ai/claude-code',
+  VERSION_CHANGELOG: '',
 }
 
 // Patch Commander.js to tolerate non-standard short flags like '-d2e'.

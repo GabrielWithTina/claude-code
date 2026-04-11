@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "start": "bun run main.tsx"
+    "start": "bun run entrypoints/cli.tsx"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest",
@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "latest",
     "@aws-sdk/client-bedrock-runtime": "latest",
     "@commander-js/extra-typings": "latest",
+    "commander": "~13.1.0",
     "@growthbook/growthbook": "latest",
     "@modelcontextprotocol/sdk": "latest",
     "@opentelemetry/api": "latest",

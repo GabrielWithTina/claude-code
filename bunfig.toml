@@ -3,5 +3,3 @@
 # Bun loads this file automatically from the project root.
 preload = ["./shims/preload.ts"]
 
-[loader]
-".md" = "text"
