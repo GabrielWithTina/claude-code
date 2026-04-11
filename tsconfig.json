@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "paths": {
+      "src/*": ["./*"],
+      "color-diff-napi": ["./native-ts/color-diff/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["node_modules"]
+}
