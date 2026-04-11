@@ -2,6 +2,21 @@
 // Runs before main.tsx via bunfig.toml preload.
 // Shims compile-time Bun modules and internal @ant/* packages that are not on npm.
 
+// MACRO is inlined at bundle/compile time by the Bun bundler.
+// At runtime (bun run), we define it as a global with sensible defaults.
+declare global {
+  var MACRO: {
+    VERSION: string
+    BUILD_TIME: string
+    ISSUES_EXPLAINER: string
+  }
+}
+globalThis.MACRO = {
+  VERSION: '0.0.1',
+  BUILD_TIME: '',
+  ISSUES_EXPLAINER: 'visit https://github.com/anthropics/claude-code/issues',
+}
+
 Bun.plugin({
   name: 'bun-bundle-shim',
   setup(build) {
@@ -20,10 +35,26 @@ Bun.plugin({
       '@ant/computer-use-mcp',
       '@ant/computer-use-input',
       '@ant/computer-use-swift',
-      '@ant/claude-for-chrome-mcp',
     ]
     for (const pkg of antStubs) {
       build.module(pkg, () => ({ exports: {}, loader: 'object' }))
     }
+
+    // @ant/claude-for-chrome-mcp exports BROWSER_TOOLS and other symbols used at module load time.
+    build.module('@ant/claude-for-chrome-mcp', () => ({
+      exports: {
+        BROWSER_TOOLS: [],
+        createClaudeForChromeMcpServer: () => { throw new Error('Claude for Chrome is not available in this build') },
+      },
+      loader: 'object',
+    }))
+
+    // .md files are bundled as text in the original build (Bun text loader).
+    // The source tree is missing those .md assets, so we return empty strings
+    // so the skills/bundled/**Content.ts imports resolve without error.
+    build.onLoad({ filter: /\.md$/ }, () => ({
+      contents: 'export default ""',
+      loader: 'js',
+    }))
   },
 })

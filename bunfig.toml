@@ -2,3 +2,6 @@
 # Registers shims/preload.ts so it runs before any script (including main.tsx).
 # Bun loads this file automatically from the project root.
 preload = ["./shims/preload.ts"]
+
+[loader]
+".md" = "text"
