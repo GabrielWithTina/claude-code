@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bun: Debug CLI",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/entrypoints/cli.tsx",
+      "runtimeArgs": ["run"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "stopOnEntry": false,
+      "watchMode": false
+    },
+    {
+      "name": "Bun: Attach to Running Process",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://127.0.0.1:6499/mytoken",
+      "stopOnEntry": false
+    }
+  ]
+}

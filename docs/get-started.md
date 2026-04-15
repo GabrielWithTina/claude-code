@@ -4,6 +4,9 @@
 # Non-interactive mode
 bun run entrypoints/cli.tsx --debug -p "outline the summary of the current project"
 
+# interactive mode
+bun run entrypoints/cli.tsx
+
 ```
 
 # Debug - A Quick Primer
@@ -26,36 +29,10 @@ search for "Bun" by Oven, and click Install. Make sure to install it in the WSL 
 
 ## How to Debug
 
-1. Open the project in VSCode:
-
-   ```
-   code /home/xiaos/git/claude-code
-   ```
-
-2. Set breakpoints by clicking the left gutter of any `.ts` / `.tsx` file
-
-3. Press `F5` (or go to **Run → Start Debugging**) and select:
-
-   ```
-   Bun: Debug CLI
-   ```
-
-4. The debugger will launch `entrypoints/cli.tsx` via Bun with debug protocol enabled
-
-5. Execution pauses at your breakpoints:
-
-   - Inspect variables
-   - Step through code
-   - Use the debug console
-
-------
-
-## Alternative: Attach to a Running Process
-
 If you want to run the app manually and attach the debugger:
 
 ```
-bun --inspect entrypoints/cli.tsx
+bun --inspect=127.0.0.1:6499/mytoken entrypoints/cli.tsx
 ```
 
 Then use the **"Bun: Attach to Running Process"** configuration in VSCode.
