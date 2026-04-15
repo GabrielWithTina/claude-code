@@ -263,7 +263,8 @@ function isBeingDebugged() {
 }
 
 // Exit if we detect node debugging or inspection
-if ("external" !== 'ant' && isBeingDebugged()) {
+// CLAUDE_CODE_ALLOW_DEBUG bypasses this for local source debugging (set by shims/preload.ts)
+if ("external" !== 'ant' && isBeingDebugged() && !process.env.CLAUDE_CODE_ALLOW_DEBUG) {
   // Use process.exit directly here since we're in the top-level code before imports
   // and gracefulShutdown is not yet available
   // eslint-disable-next-line custom-rules/no-top-level-side-effects

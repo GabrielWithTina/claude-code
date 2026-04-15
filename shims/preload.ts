@@ -10,6 +10,11 @@
 // isGrowthBookEnabled() to return false and all feature flags to return defaults.
 process.env.DISABLE_TELEMETRY = '1'
 
+// Allow bun --inspect debugging from source. main.tsx has an anti-debug guard
+// that exits when it detects --inspect flags (for the production binary). This
+// env var bypasses that check so the source tree can be debugged normally.
+process.env.CLAUDE_CODE_ALLOW_DEBUG = '1'
+
 // MACRO is inlined at bundle/compile time by the Bun bundler.
 // At runtime (bun run), we define it as a global with sensible defaults.
 declare global {
