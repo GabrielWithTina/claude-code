@@ -208,7 +208,7 @@ The full string is prefixed with `MEMORY_INSTRUCTION_PROMPT`:
 
 ```mermaid
 flowchart LR
-    subgraph Static prefix — cacheable globally
+    subgraph static["Static prefix - cacheable globally"]
         A[Identity + CYBER_RISK]
         B[System rules]
         C[Coding guidelines]
@@ -217,7 +217,7 @@ flowchart LR
         F[Tone + output efficiency]
     end
     G([SYSTEM_PROMPT_DYNAMIC_BOUNDARY]) --- H
-    subgraph Dynamic suffix — session-local
+    subgraph dynamic["Dynamic suffix - session-local"]
         H[session_guidance\ntool permissions change per-session]
         I[memory prompt]
         J[env_info: cwd, model, OS]
