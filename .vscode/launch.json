@@ -2,10 +2,24 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Bun: Debug CLI",
+      "name": "Bun: Debug CLI (interactive REPL)",
       "type": "bun",
       "request": "launch",
       "program": "${workspaceFolder}/entrypoints/cli.tsx",
+      "runtimeArgs": ["run"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "stopOnEntry": false,
+      "watchMode": false
+    },
+    {
+      // QueryEngine.ts is only loaded in headless (-p) mode.
+      // Use this config to hit breakpoints in QueryEngine.ts.
+      "name": "Bun: Debug CLI (headless -p)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/entrypoints/cli.tsx",
+      "args": ["-p", "Hello"],
       "runtimeArgs": ["run"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -17,7 +31,10 @@
       "type": "bun",
       "request": "attach",
       "url": "ws://127.0.0.1:6499/mytoken",
-      "stopOnEntry": false
+      "stopOnEntry": false,
+      "sourceMapPathOverrides": {
+        "e/*": "${workspaceFolder}/*"
+      }
     }
   ]
 }

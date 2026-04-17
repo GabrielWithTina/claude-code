@@ -4,38 +4,46 @@ AutoDream is a background service that periodically spawns a forked subagent (th
 
 ---
 
-## Four-Gate Activation
+## Activation: Enabled Precondition + Three Gates
 
-Gates are evaluated cheapest-first. Any failing gate aborts without advancing to the next.
+The source labels three named gates (Time, Sessions, Lock). Before reaching them, an enabled precondition (`isGateOpen()`) is evaluated. Gates are evaluated cheapest-first. Any failing check aborts without advancing.
 
 ```mermaid
 flowchart TD
-    A([Turn end hook]) --> G1
+    A([Turn end hook]) --> P
 
-    G1{Gate 1\nEnabled?}
-    G1 -->|"isAutoDreamEnabled()\n+ isAutoMemoryEnabled()\n+ !KAIROS + !remote"| G2
-    G1 -->|fail| SKIP([skip])
+    P{Precondition\nisGateOpen}
+    P -->|"!KAIROS\n!remote\nisAutoMemoryEnabled()\nisAutoDreamEnabled()"| G1
+    P -->|fail| SKIP([skip])
 
-    G2{Gate 2\nTime gate}
-    G2 -->|"(now - lastConsolidatedAt)\n>= minHours (default 24h)\none stat() call"| G3
+    G1{Gate 1\nTime gate}
+    G1 -->|"(now - lastConsolidatedAt)\n>= minHours (default 24h)\none stat() call"| TH
+    G1 -->|fail| SKIP
+
+    TH{Scan throttle}
+    TH -->|"sinceScan >= 10 min"| G2
+    TH -->|"< 10 min"| SKIP
+
+    G2{Gate 2\nSession gate}
+    G2 -->|"transcripts with mtime > lastConsolidatedAt\n>= minSessions (default 5)\nexcludes current session"| G3
     G2 -->|fail| SKIP
 
-    G3{Gate 3\nSession gate\n(throttled 10 min)}
-    G3 -->|"transcripts with mtime > lastConsolidatedAt\n>= minSessions (default 5)\nexcludes current session"| G4
-    G3 -->|fail| SKIP
-
-    G4{Gate 4\nLock}
-    G4 -->|"tryAcquireConsolidationLock()\nreturns priorMtime or null"| RUN([fire dream agent])
-    G4 -->|null = held| SKIP
+    G3{Gate 3\nLock}
+    G3 -->|"tryAcquireConsolidationLock()\nreturns priorMtime or null"| RUN([fire dream agent])
+    G3 -->|null = held| SKIP
 ```
 
-**Gate 1 — Enabled check.** `isAutoDreamEnabled()` reads `autoDreamEnabled` from `settings.json` first; if unset, falls through to `tengu_onyx_plover.enabled` in GrowthBook. `isAutoMemoryEnabled()` checks `CLAUDE_CODE_DISABLE_AUTO_MEMORY`, `CLAUDE_CODE_SIMPLE`, and CCR-without-persistent-storage conditions. KAIROS mode skips because it uses its own disk-skill dream path. Remote mode skips unconditionally.
+**Precondition — `isGateOpen()`.** Checked in order: KAIROS active → return false (KAIROS uses its own disk-skill dream path); remote mode → return false; `isAutoMemoryEnabled()` → checks `CLAUDE_CODE_DISABLE_AUTO_MEMORY`, `CLAUDE_CODE_SIMPLE`, and CCR-without-persistent-storage; `isAutoDreamEnabled()` → reads `autoDreamEnabled` from `settings.json` first; if unset, falls through to `tengu_onyx_plover.enabled` in GrowthBook.
 
-**Gate 2 — Time gate.** Reads lock file mtime via `readLastConsolidatedAt()` — a single `stat()` call. Returns `0` if no lock file exists (first ever run). Per-turn cost when enabled but time hasn't passed: one stat.
+**Gate 1 — Time gate.** Reads lock file mtime via `readLastConsolidatedAt()` — a single `stat()` call. Returns `0` if no lock file exists (first ever run). Per-turn cost when enabled but time hasn't passed: one stat.
 
-**Gate 3 — Session gate.** Scans per-cwd transcript directory with `listSessionsTouchedSince(lastAt)`. Uses mtime (sessions touched since consolidation, not birthtime). The current session is excluded — its mtime is always recent. Scan is throttled to once per 10 minutes (`SESSION_SCAN_INTERVAL_MS`) because when time-gate passes but session-gate fails, the lock mtime doesn't advance, so the time-gate would fire every turn without a throttle.
+**Scan throttle.** After the time gate passes, the session scan itself is throttled to once per 10 minutes (`SESSION_SCAN_INTERVAL_MS`). This is a separate early-exit between Gate 1 and Gate 2: when the time gate passes but the session gate fails, the lock mtime doesn't advance, so the time gate would fire every turn without this throttle.
 
-**Gate 4 — Lock.** `tryAcquireConsolidationLock()` writes the current PID to `.consolidate-lock` in the memory directory, then reads back to verify it won the race. Returns `priorMtime` (for rollback) on success, `null` if blocked. Stale lock detection: if the lock is held by a PID that `isProcessRunning()` returns false for, it is reclaimed. Locks older than 1 hour are considered stale even if the PID is live (PID reuse guard).
+**Gate 2 — Session gate.** Scans per-cwd transcript directory with `listSessionsTouchedSince(lastAt)`. Uses mtime (sessions touched since consolidation, not birthtime). The current session is excluded — its mtime is always recent.
+
+**Gate 3 — Lock.** `tryAcquireConsolidationLock()` writes the current PID to `.consolidate-lock` in the memory directory, then reads back to verify it won the race. Returns `priorMtime` (for rollback) on success, `null` if blocked. Stale lock detection: if the lock is held by a PID that `isProcessRunning()` returns false for, it is reclaimed. Locks older than 1 hour are considered stale even if the PID is live (PID reuse guard). If the body is unparseable, the lock is also reclaimed within the 1-hour window.
+
+**Force override.** An internal `isForced()` function (always `false` in external builds, overridable in ant builds) bypasses the precondition and Gates 1–2 but **not** Gate 3. Under force, the lock is not acquired — the existing `lastAt` is used as `priorMtime` so a kill's rollback is a no-op. The session scan still runs to populate prompt hints.
 
 ---
 
@@ -64,11 +72,12 @@ sequenceDiagram
     participant Dream as Dream subagent
     participant UI as DreamTask (UI)
 
-    Hook->>AD: executeAutoDream(context)
-    AD->>AD: gates 1–3 (enabled, time, sessions)
+    Hook->>AD: executeAutoDream(context, appendSystemMessage?)
+    AD->>AD: precondition + gates 1–2 (enabled, time, sessions)
     AD->>Lock: tryAcquireConsolidationLock()
     Lock-->>AD: priorMtime (or null → abort)
 
+    AD->>AD: resolve setAppState (setAppStateForTasks ?? setAppState)
     AD->>UI: registerDreamTask(sessionsReviewing, priorMtime, abortController)
     UI-->>AD: taskId
 
@@ -85,7 +94,7 @@ sequenceDiagram
     alt success
         Fork-->>AD: result
         AD->>UI: completeDreamTask(taskId)
-        AD->>Hook: appendSystemMessage("Improved N memory files")
+        AD->>Hook: appendSystemMessage(createMemorySavedMessage(filesTouched), verb='Improved')
     else failure (non-abort)
         AD->>Lock: rollbackConsolidationLock(priorMtime)
         AD->>UI: failDreamTask(taskId)
@@ -96,7 +105,7 @@ sequenceDiagram
 
 **`initAutoDream()`** must be called once at startup (alongside `initExtractMemories` in `backgroundHousekeeping`). It creates a closure over `lastSessionScanAt` — tests call it in `beforeEach` for a fresh closure.
 
-**`executeAutoDream()`** is the per-turn entry point from `stopHooks`. It is a no-op until `initAutoDream()` has been called. Per-turn cost when fully enabled: one GB cache read + one `stat()`.
+**`executeAutoDream(context, appendSystemMessage?)`** is the per-turn entry point from `stopHooks`. It is a no-op until `initAutoDream()` has been called. Per-turn cost when enabled: one GB cache read + one `stat()`. `appendSystemMessage` is optional; when provided, a completion note is appended to the main transcript only if files were touched.
 
 ---
 

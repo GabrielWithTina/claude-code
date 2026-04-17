@@ -171,13 +171,11 @@ wrappedCanUseTool(tool, input, ctx, assistantMsg, toolUseID, forceDecision)
 
 `ask()` is a one-shot generator that creates a `QueryEngine`, calls `submitMessage()` once, and returns the engine's read-file state to the caller when done.
 
-When the `HISTORY_SNIP` feature flag is compiled in, `ask()` injects a `snipReplay` callback. On each `compact_boundary` system message, this callback invokes `snipCompactIfNeeded()` and replaces `mutableMessages` with the snipped result — bounding memory in long headless sessions without affecting the REPL (which projects its own view via `projectSnippedView`).
-
 ```
 ask(params):
   engine = new QueryEngine({
     ...params,
-    snipReplay: (yieldedMsg, store) => {
+    snipReplay: (yieldedMsg, store) => {       // only injected when HISTORY_SNIP compiled in
       if (!isSnipBoundaryMessage(yieldedMsg)) return undefined
       return snipCompactIfNeeded(store, { force: true })
     }
@@ -185,6 +183,42 @@ ask(params):
   yield* engine.submitMessage(prompt, { uuid, isMeta })
   setReadFileCache(engine.getReadFileState())
 ```
+
+### HISTORY_SNIP and the `snipReplay` callback
+
+`HISTORY_SNIP` is a **model-initiated, surgical message removal** feature — distinct from auto-compact, which replaces old history with an LLM-generated prose summary. Snip lets the model drop specific older turns without summarization by calling `SnipTool`.
+
+**How it works end-to-end:**
+
+**1 — ID tagging.** When `HISTORY_SNIP` is enabled, every user message gets an `[id:uuid]` tag appended to its content (`appendMessageTagToUserMessage` in `messages.ts`) before the payload is sent to the API. This gives the model a stable handle to reference specific turns.
+
+**2 — SnipTool.** The model calls `SnipTool` with a list of UUIDs it wants removed. The tool writes a **`snip_boundary` system message** into the message store — a control record saying "these UUIDs are snipped".
+
+**3 — Two paths for applying the snip.** The REPL and the SDK handle snip boundaries differently because they have different constraints:
+
+| | REPL | SDK / headless (`ask()`) |
+|---|---|---|
+| Goal | Keep full history for UI scrollback | Bound memory — no UI needs the old messages |
+| Approach | **Project** a filtered view at API-call time | **Actually remove** snipped messages from `mutableMessages` |
+| Function | `projectSnippedView()` inside `getMessagesAfterCompactBoundary()` | `snipCompactIfNeeded()` via `snipReplay` callback |
+
+**REPL path.** `getMessagesAfterCompactBoundary()` calls `projectSnippedView(messages)` every time it builds the API payload. This filters snipped messages on-the-fly but leaves `AppState.messages` untouched so the user can still scroll up and see the full history.
+
+**SDK path — `snipReplay`.** Inside `QueryEngine.submitMessage()`, every system message yielded by `query()` is tested against `snipReplay` first. When it recognises a snip boundary, `snipCompactIfNeeded` walks `mutableMessages`, finds all UUIDs marked for removal, and physically rewrites the array:
+
+```typescript
+// Inside submitMessage() system message handler:
+const snipResult = this.config.snipReplay?.(message, this.mutableMessages)
+if (snipResult !== undefined) {
+  if (snipResult.executed) {
+    this.mutableMessages.length = 0
+    this.mutableMessages.push(...snipResult.messages)
+  }
+  break   // snip boundary is consumed, not pushed to mutableMessages
+}
+```
+
+The boundary message itself is consumed by the `break` — it never enters `mutableMessages`. In long headless sessions there is no UI, so removed messages have no value; keeping them would grow `mutableMessages` without bound across many turns.
 
 ---
 

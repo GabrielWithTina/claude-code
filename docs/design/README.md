@@ -9,7 +9,7 @@ Claude Code is Anthropic's CLI for Claude: a terminal application that runs as b
 | Path | Role |
 |---|---|
 | `main.tsx` | Entry point: CLI argument parsing, auth, startup prefetch, REPL/headless dispatch |
-| `QueryEngine.ts` | Session lifecycle: owns messages, usage, and permission state across turns |
+| `QueryEngine.ts` | Session lifecycle for the **headless/SDK path only**: owns messages, usage, and permission state across turns. Not used in interactive mode. |
 | `query.ts` | LLM loop: streaming, tool dispatch, compaction, stop-hooks |
 | `context.ts` | User/system context: git status, CLAUDE.md files, memory files |
 | `utils/queryContext.ts` | System-prompt assembly: `fetchSystemPromptParts()` for cache-key prefix |
@@ -39,9 +39,9 @@ Claude Code is Anthropic's CLI for Claude: a terminal application that runs as b
 flowchart TD
     CLI["CLI / main.tsx\n(arg parsing, auth, startup prefetch)"]
     REPL["screens/REPL.tsx\n(interactive terminal, React/Ink)"]
-    SDK["Headless / SDK path\n(ask() / QueryEngine)"]
+    SDK["Headless / SDK path\n(cli/print.ts → ask())"]
 
-    QE["QueryEngine.ts\n(session state, submitMessage())"]
+    QE["QueryEngine.ts\n(session state, submitMessage())\nheadless path only"]
     Q["query.ts\n(LLM loop, streaming, tool dispatch)"]
 
     CTX["context.ts\n(git status, CLAUDE.md, memory)"]
@@ -61,19 +61,19 @@ flowchart TD
 
     CLI --> REPL
     CLI --> SDK
-    REPL --> QE
+    REPL --> Q
     SDK --> QE
-    QE --> QC
+    QE --> Q
+    REPL --> QC
     QC --> CTX
     QC --> SP
-    QE --> Q
     Q --> API
     Q --> TR
     TR --> TT
     TR --> TD
     Q --> COMPACT
-    QE --> MCP
-    QE --> COORD
+    REPL --> MCP
+    REPL --> COORD
     CLI --> DREAM
 ```
 
@@ -81,20 +81,48 @@ flowchart TD
 
 ## Data Flow
 
+Two distinct paths share `query.ts` but differ in session management.
+
+### Interactive path (REPL)
+
 ```mermaid
 sequenceDiagram
     participant User
-    participant REPL as screens/REPL.tsx
-    participant QE as QueryEngine
+    participant REPL as screens/REPL.tsx (+ hooks)
     participant Q as query()
     participant API as Anthropic API
     participant Tools as Tool executor
 
     User->>REPL: types message
-    REPL->>QE: submitMessage(prompt)
+    REPL->>REPL: fetchSystemPromptParts() — via queryContext
+    REPL->>REPL: process slash commands (React hook layer)
+    REPL->>Q: query(messages, systemPrompt, ...)
+    Q->>API: callModel() — streaming
+    API-->>Q: stream events (assistant blocks)
+    Q-->>REPL: yield assistant message
+    Q->>Tools: runTools(toolUseBlocks)
+    Tools-->>Q: tool results (user messages)
+    Q-->>REPL: yield tool result messages
+    Q->>API: callModel() — next turn
+    API-->>Q: end_turn
+    Q-->>REPL: return Terminal
+    REPL-->>User: renders response
+```
+
+### Headless / SDK path (–p / ask())
+
+```mermaid
+sequenceDiagram
+    participant Caller as cli/print.ts
+    participant QE as QueryEngine
+    participant Q as query()
+    participant API as Anthropic API
+    participant Tools as Tool executor
+
+    Caller->>QE: ask(prompt, options)
     QE->>QE: fetchSystemPromptParts()
     QE->>QE: processUserInput() — slash commands
-    QE-->>REPL: yield system_init (tools, model, permissions)
+    QE-->>Caller: yield system_init (tools, model, permissions)
     QE->>Q: query(messages, systemPrompt, ...)
     Q->>API: callModel() — streaming
     API-->>Q: stream events (assistant blocks)
@@ -105,8 +133,7 @@ sequenceDiagram
     Q->>API: callModel() — next turn
     API-->>Q: end_turn
     Q-->>QE: return Terminal
-    QE-->>REPL: yield result (success / error subtype)
-    REPL-->>User: renders response
+    QE-->>Caller: yield result (success / error subtype)
 ```
 
 ---
@@ -116,12 +143,14 @@ sequenceDiagram
 | File | Covers |
 |---|---|
 | [README.md](./README.md) | Top-level architecture, module map, data-flow sequence |
-| [query-engine.md](./query-engine.md) | `QueryEngine` — session lifecycle, `submitMessage()` pipeline, budget control, SDK message types |
+| [main.md](./main.md) | `main.tsx` — CLI entry point, startup sequence, Commander options, interactive vs headless dispatch, special modes, subsystem init |
+| [repl.md](./repl.md) | `screens/REPL.tsx` — interactive terminal component, query loop, state model, input handling, permissions, hooks |
+| [query-engine.md](./query-engine.md) | `QueryEngine` — session lifecycle, `submitMessage()` pipeline, budget control, SDK message types (headless/SDK path only) |
 | [query-loop.md](./query-loop.md) | `query()` — LLM streaming loop, tool execution, compaction, token budgets, error recovery |
 | [context.md](./context.md) | System-prompt assembly, CLAUDE.md loading, git status, cache boundary |
 | [tool-system.md](./tool-system.md) | `Tool` interface, `ToolUseContext`, `buildTool()`, registry assembly (`getTools`, `assembleToolPool`) |
 | [permissions.md](./permissions.md) | Permission modes, `ToolPermissionContext`, rule sources, `canUseTool` dispatch, protected files |
 | [coordinator.md](./coordinator.md) | Multi-agent coordinator mode: coordinator vs worker roles, system prompt injection, agent lifecycle |
-| [autodream.md](./autodream.md) | Background memory consolidation: three-gate system, dream agent, consolidation lock |
+| [autodream.md](./autodream.md) | Background memory consolidation: enabled precondition + three gates, dream agent, consolidation lock |
 | [commands.md](./commands.md) | Slash command registry, custom skill commands, dispatch flow |
 | [mcp.md](./mcp.md) | MCP server integration: connections, transports, tool wrapping, auth, resource support |
