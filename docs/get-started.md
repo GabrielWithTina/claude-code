@@ -32,7 +32,7 @@ search for "Bun" by Oven, and click Install. Make sure to install it in the WSL 
 If you want to run the app manually and attach the debugger:
 
 ```
-bun --inspect=127.0.0.1:6499/mytoken entrypoints/cli.tsx
+bun --inspect-wait=127.0.0.1:6499/mytoken entrypoints/cli.tsx
 ```
 
 Then use the **"Bun: Attach to Running Process"** configuration in VSCode.
@@ -40,10 +40,11 @@ Then use the **"Bun: Attach to Running Process"** configuration in VSCode.
 To further profile the instance with extensive debugging info:
 ```
 export CLAUDE_CODE_PROFILE_QUERY=1 
-bun --inspect=127.0.0.1:6499/mytoken entrypoints/cli.tsx --debug
+bun --inspect-wait=127.0.0.1:6499/mytoken entrypoints/cli.tsx --debug
 ```
 
 Then see the debug info in `~/.claude/debug/latest`
+
 ------
 
 ## Important Caveats for This Project

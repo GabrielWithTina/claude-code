@@ -133,6 +133,201 @@ When the abort controller fires during tool execution, `StreamingToolExecutor.ge
 
 ---
 
+## History Snip (`HISTORY_SNIP`)
+
+History Snip is an **ant-only, compile-time gated** (`feature('HISTORY_SNIP')`) strategy where the **model itself** decides which old conversation turns to remove. Every other compaction mechanism is system-driven (thresholds, timers). Snip is model-driven.
+
+### The three moving parts
+
+**`SnipTool`** — registered into the active tool list (`tools.ts:123`) when the feature is on. The model calls it mid-turn with a list of message UUIDs it considers stale. The tool call is recorded in the transcript like any other tool use.
+
+**`[id:UUID]` tags** — before every API call, `sanitizeMessagesForAPI` (`messages.ts:2351`) injects an `[id:UUID]` tag into every non-meta user message (after all merging, so the tag always matches the surviving message's `uuid`). This gives the model stable handles to reference specific turns when calling `SnipTool`.
+
+**`snipCompactIfNeeded()`** — the pre-call cleanup. Runs **first** in the query loop (`query.ts:401`), before microcompact. Scans `messagesForQuery` for recorded `SnipTool` calls, extracts the `removedUuids` they carried, and physically removes those messages from the array.
+
+```mermaid
+sequenceDiagram
+    participant Model
+    participant SnipTool
+    participant query as query loop
+    participant snipCompact as snipCompactIfNeeded()
+    participant autoCompact
+
+    Model->>SnipTool: call with removedUuids=[uuid1, uuid2, ...]
+    SnipTool-->>Model: tool_result (recorded in transcript)
+
+    Note over query: next query iteration
+    query->>snipCompact: messagesForQuery
+    snipCompact->>snipCompact: scan for SnipTool calls\nextract removedUuids\nremove those messages
+    snipCompact-->>query: { messages, tokensFreed, boundaryMessage? }
+    query->>query: yield boundaryMessage (snip_boundary)\nif tokensFreed > 0
+    query->>autoCompact: tokenCount - tokensFreed\n(corrected threshold input)
+```
+
+Returns `tokensFreed` — the rough delta of removed tokens. This is subtracted from `tokenCountWithEstimation` before the autocompact threshold check (`query.ts:638`, `autoCompact.ts:225`) so the system doesn't falsely trigger autocompact in the window between snip clearing space and the stale usage counter catching up.
+
+### Nudge mechanism — `context_efficiency` attachment
+
+When `shouldNudgeForSnips(messages)` returns true (the conversation has grown without recent snips or boundaries), `getContextEfficiencyAttachment()` (`attachments.ts:3963`) emits a `context_efficiency` attachment. This becomes a `<system-reminder>` meta user message carrying `SNIP_NUDGE_TEXT` — a prompt hint telling the model to call `SnipTool` on turns it no longer needs. The nudge interval resets on prior nudges, snip markers, snip boundaries, and compact boundaries.
+
+### REPL vs SDK — two views of history
+
+The REPL keeps the full original `messages` array for UI scrollback, exactly like context collapse's projection model:
+
+- **Model-facing path**: `getMessagesAfterCompactBoundary()` (`messages.ts:4648`) calls `projectSnippedView()` (`snipProjection.js`) to filter snipped messages out before the array reaches the API.
+- **SDK / QueryEngine**: a `snipReplay` callback (`QueryEngine.ts:1278`) is injected into `QueryEngineConfig`. On each yielded `snip_boundary` system message it calls `snipCompactIfNeeded(store, { force: true })` and truncates `mutableMessages` in-place — bounding memory in long headless sessions where there is no UI to preserve.
+
+### Session restore
+
+`applySnipRemovals()` (`sessionStorage.ts:1982`) runs during resume. It walks the transcript, finds all entries carrying `snipMetadata.removedUuids`, and deletes those UUIDs from the message map. It then relinks survivors whose `parentUuid` now points to a deleted entry using path-compressed backward resolution, so resumed sessions see the same trimmed history the model last saw.
+
+### Comparison with other compaction mechanisms
+
+| | History Snip | microcompact | context collapse | auto-compact |
+|---|---|---|---|---|
+| Who decides | **The model** | System (count/time) | System (token threshold) | System (token threshold) |
+| Granularity | Individual messages by UUID | Tool result content | Conversation spans | Entire history |
+| Output | Messages physically removed | Content zeroed / cache-edited | Projection (summary placeholder) | New summarised array |
+| Order in loop | **1st** | 2nd | 3rd | 4th |
+| Gating | ant-only, compile-time DCE | ant-only (cached) / all (time-based) | ant-only, compile-time DCE | All builds |
+| `tokensFreed` plumbed to autocompact | Yes | No | No (owns threshold) | N/A |
+| Nudge to model | `context_efficiency` attachment | No | No | `compaction_reminder` attachment |
+| Force command | `/force-snip` | No | No | `/compact` |
+
+---
+
+## Microcompact
+
+Microcompact is a lightweight, pre-API-call trim of old tool result content. It runs **first** in the query loop (before context collapse and auto-compact) on every iteration. Rather than summarising conversation history, it zeroes out the content of old `tool_result` blocks that are unlikely to be re-read by the model.
+
+Only results from `COMPACTABLE_TOOLS` (FileRead, Bash, Grep, Glob, WebSearch, WebFetch, FileEdit, FileWrite) are eligible. The last `keepRecent` results (default: 5) are always preserved.
+
+There are two active paths and one no-op:
+
+```mermaid
+flowchart TD
+    A([microcompactMessages called]) --> B{main thread +\nCACHED_MICROCOMPACT\nfeature + model supported?}
+    B -- yes --> C[cachedMicrocompactPath]
+    C --> C1[register new tool_result IDs\ninto CachedMCState]
+    C1 --> C2[getToolResultsToDelete\nIDs exceeding keepRecent threshold]
+    C2 --> C3{any IDs to delete?}
+    C3 -- yes --> C4[build cache_edits block\nstore as pendingCacheEdits]
+    C4 --> C5[return messages UNCHANGED\n+ compactionInfo.pendingCacheEdits]
+    C3 -- no --> C5
+    B -- no --> D{time-based trigger?\ngap since last assistant msg\n> gapThresholdMinutes 60min}
+    D -- yes --> E[collect compactable tool IDs\nclear .content of all but keepRecent\nreplace with 'Old tool result content cleared'\nreset cached-MC state]
+    E --> F[return mutated messages]
+    D -- no --> G[no-op: return messages unchanged]
+```
+
+### Cached microcompact (ant-only, `CACHED_MICROCOMPACT` feature)
+
+Uses the Anthropic **cache editing beta API** (`cache-editing-2025-04-14`) to delete old tool results from the server's KV cache. The local `Message[]` array is returned **unchanged** — only the server-side cache is edited. This preserves the prompt cache prefix while reducing billed cache-read tokens.
+
+After the API call returns, `consumePendingCacheEdits()` retrieves the queued block. `pinCacheEdits()` stores it by user-message position so it is re-sent on every subsequent request, maintaining the deletion in future cache hits. The microcompact boundary message (reporting `cache_deleted_input_tokens`) is deferred until after the API response so it uses the real server-reported savings rather than a client estimate.
+
+### Time-based microcompact
+
+Fires when the server-side 1-hour prompt cache has almost certainly expired (gap > 60 min, configured via GrowthBook flag `tengu_slate_heron`). Since the full prefix will be rewritten on the next call regardless, clearing old tool results before sending shrinks what gets re-transmitted and re-cached. Content is replaced in-place in the local `Message[]`; no cache-editing API is needed.
+
+### Comparison with auto-compact
+
+| | microcompact | auto-compact |
+|---|---|---|
+| Trigger | Every call (count/time threshold) | Token count > 93% effective window |
+| Scope | Tool result content only | Entire conversation → single summary |
+| Cache impact | Cache-editing: server KV preserved; time-based: cold, full rewrite | Full cache invalidation |
+| Yields boundary message | Yes (microcompact boundary) | Yes (compact boundary) |
+
+---
+
+## Context Collapse
+
+Context collapse (`CONTEXT_COLLAPSE` feature, internal codename **marble_origami**) is an incremental, span-by-span compaction strategy. It runs **second** in the query loop — after microcompact and **before** auto-compact, which it suppresses when enabled.
+
+Instead of replacing the entire conversation with one summary (as auto-compact does), collapse replaces individual contiguous spans (one assistant turn + its tool calls + results) with a short LLM-generated summary. The REPL always holds the original, complete `messages` array; collapse operates through a **projection layer** (`projectView`) that the API call sees, not the source of truth.
+
+### Collapse anatomy
+
+```
+Original messages:     [sys] [u1] [a1 + tools] [u2 tool_results] [u3] [a2] ...
+                              ↑──── span 1 archived ────↑
+After projectView:     [sys] [<collapsed id="1">summary</collapsed>] [u3] [a2] ...
+```
+
+A committed collapse stores:
+- `firstArchivedUuid` / `lastArchivedUuid` — span boundary UUIDs in the original array
+- `summaryContent` — the model-generated text substituted for the span
+- Persisted as `marble-origami-commit` entries in the transcript (append-only log)
+
+Staged collapses are summaries generated by the background ctx-agent but not yet committed. They are stored in the `ContextCollapseSnapshotEntry` (`type: 'marble-origami-snapshot'`) and committed when the token count crosses the commit threshold.
+
+### Query loop integration
+
+```mermaid
+flowchart TD
+    A([applyCollapsesIfNeeded]) --> B[projectView\nsubstitute archived spans\nwith summary placeholders]
+    B --> C{projected token count\n≥ commit threshold ~90%?}
+    C -- yes --> D[commit staged spans\nappend marble-origami-commit entries]
+    D --> E{still above threshold\nafter draining staged?}
+    E -- yes --> F{blocking spawn\n≥ 95% window?}
+    F -- yes --> G[spawn ctx-agent synchronously\nwait for summary before proceeding]
+    F -- no --> H[spawn ctx-agent in background\nfor next iteration]
+    E -- no --> I([return projected messages])
+    G --> I
+    H --> I
+    C -- no --> I
+
+    I --> J[API call proceeds\nwith projected messages]
+    J --> K{API returns\nprompt_too_long 413?}
+    K -- yes --> L[isWithheldPromptTooLong\nwithhold 413 from stream]
+    L --> M[recoverFromOverflow\nforce-commit all staged spans]
+    M --> N{committed > 0?}
+    N -- yes --> O[retry loop\ntransition = collapse_drain_retry]
+    N -- no --> P[fall through to\nreactive compact]
+    K -- no --> Q([stream events to caller])
+```
+
+### Token threshold ladder
+
+Three thresholds govern the collapse lifecycle:
+
+| Threshold | Action |
+|-----------|--------|
+| ~90% effective window | Commit staged spans; spawn ctx-agent in background for next spans |
+| ~95% effective window | **Blocking spawn** — ctx-agent runs synchronously, query loop waits |
+| Real API 413 | `recoverFromOverflow` — drain entire staged queue in one shot, then retry |
+
+Auto-compact sits at ~93% — between the 90% commit start and 95% blocking spawn — but is **suppressed** when context collapse is enabled to prevent the two systems from racing.
+
+### The ctx-agent (`marble_origami` query source)
+
+Summarization is performed by a forked sub-agent with `querySource === 'marble_origami'`. It has read-only access to the span being archived. It is explicitly excluded from auto-compact: if the ctx-agent's own context overflowed and auto-compact fired, `runPostCompactCleanup` would call `resetContextCollapse()`, destroying the main thread's committed log (shared module-level state). A guard in `autoCompact.ts` prevents this.
+
+### State persistence
+
+| Entry type | Purpose |
+|-----------|---------|
+| `marble-origami-commit` | Append-only log of committed collapses; replayed in order on session resume to reconstruct the projection |
+| `marble-origami-snapshot` | Latest staged-queue snapshot; last-wins on restore |
+
+On resume, `restoreFromEntries()` rebuilds the collapse store. `projectView` lazily fills the archived message arrays the first time it encounters each span boundary in the resumed messages.
+
+### Comparison with auto-compact and microcompact
+
+| | microcompact | context collapse | auto-compact |
+|---|---|---|---|
+| Order in loop | 1st | 2nd | 3rd |
+| Scope | Tool result content | Per-span incremental summary | Full conversation summary |
+| Granularity | Individual tool results | Individual conversation spans | Entire history |
+| Original messages preserved | Content zeroed | Yes (projection only) | No — replaced |
+| Cache impact | Cache-editing: no break; time-based: cold | None until commit | Full invalidation |
+| Suppresses auto-compact | No | Yes (when enabled) | N/A |
+| Emergency recovery | No | `recoverFromOverflow` on real 413 | Reactive compact fallback |
+| External builds | No-op | Not compiled (DCE) | Always present |
+
+---
+
 ## Compaction Sequence
 
 Auto-compact fires proactively when the token count nears the model's context limit. Reactive compact fires retroactively when the API returns a `prompt_too_long` (413) error that was withheld from the caller during streaming.

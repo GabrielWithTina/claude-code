@@ -96,6 +96,215 @@ sequenceDiagram
 
 ---
 
+### `onQueryImpl` — Context Assembly Detail
+
+The four context objects built inside `onQueryImpl` control what the model sees and what tools can do. They are assembled in parallel (via `Promise.all`) before the `query()` loop begins.
+
+```mermaid
+sequenceDiagram
+    participant onQueryImpl
+    participant getToolUseContext
+    participant getSystemPrompt as getSystemPrompt()<br/>constants/prompts.ts
+    participant buildEffective as buildEffectiveSystemPrompt()<br/>utils/systemPrompt.ts
+    participant getUserContext as getUserContext()<br/>context.ts
+    participant getSystemContext as getSystemContext()<br/>context.ts
+    participant appendSystemContext as appendSystemContext()<br/>utils/api.ts
+    participant prependUserContext as prependUserContext()<br/>utils/api.ts
+    participant query as query() — query.ts
+    participant API as Anthropic API
+
+    onQueryImpl->>getToolUseContext: messages, newMessages,<br/>abortController, model
+    getToolUseContext-->>onQueryImpl: toolUseContext<br/>(tools, mcpClients, callbacks, state accessors…)
+
+    par parallel resolution
+        onQueryImpl->>getSystemPrompt: tools, model, mcpClients
+        getSystemPrompt-->>onQueryImpl: defaultSystemPrompt: string[]
+    and
+        onQueryImpl->>getUserContext: (no args — memoized)
+        getUserContext-->>onQueryImpl: { claudeMd, currentDate }
+    and
+        onQueryImpl->>getSystemContext: (no args — memoized)
+        getSystemContext-->>onQueryImpl: { gitStatus, cacheBreaker? }
+    end
+
+    onQueryImpl->>buildEffective: defaultSystemPrompt + toolUseContext<br/>+ customSystemPrompt + appendSystemPrompt
+    buildEffective-->>onQueryImpl: systemPrompt: readonly string[]
+
+    onQueryImpl->>onQueryImpl: merge userContext with<br/>coordinatorContext + terminalFocus
+
+    onQueryImpl->>query: messages, systemPrompt,<br/>userContext, systemContext, toolUseContext
+
+    query->>appendSystemContext: systemPrompt + systemContext
+    appendSystemContext-->>query: fullSystemPrompt (string[])
+
+    query->>prependUserContext: messages + userContext
+    prependUserContext-->>query: messages with synthetic<br/>system-reminder prepended
+
+    query->>API: fullSystemPrompt + augmented messages
+```
+
+---
+
+### `toolUseContext` — `ToolUseContext` / `ProcessUserInputContext`
+
+**Built by:** `getToolUseContext()` (`screens/REPL.tsx` line 2392)  
+**Type:** `ProcessUserInputContext = ToolUseContext & LocalJSXCommandContext` (`Tool.ts` line 158, `utils/processUserInput/processUserInput.ts` line 62)
+
+`toolUseContext` is the single shared bag of state and callbacks threaded through `query()` and every tool call. It is rebuilt on every turn to capture fresh store state without relying on stale React render closures.
+
+**`options` sub-object** (fields relevant to the query loop):
+
+| Field | Source | Purpose |
+|-------|--------|---------|
+| `commands` | REPL props | Registered slash commands; available to tools at runtime |
+| `tools` | `computeTools()` → `assembleToolPool()` | Fresh tool list read from store, bypassing render-closure staleness |
+| `mainLoopModel` | parameter | Model string for this turn |
+| `thinkingConfig` | store | Extended thinking on/off + budget |
+| `mcpClients` | merged prop + store | Live MCP server connections |
+| `mcpResources` | store | Discovered MCP resource manifests |
+| `agentDefinitions` | store | Available agent types for subagent spawning |
+| `customSystemPrompt` / `appendSystemPrompt` | REPL props | `--system-prompt` / `--append-system-prompt` CLI flags |
+| `refreshTools` | `computeTools` callback | Called mid-query (e.g. after MCP reconnect) to rebuild the tool list without restarting the turn |
+
+**Top-level fields** (beyond `options`):
+
+| Field | Purpose |
+|-------|---------|
+| `abortController` | Shared signal for this turn; tools abort long I/O on cancel |
+| `getAppState()` | Pure store read — no side effects; used by tools that need current state |
+| `setAppState` | Global state updater; tools write task state, permissions, etc. |
+| `messages` / `setMessages` | Current transcript + updater |
+| `readFileState` | Ref to file-read cache for CLAUDE.md content dedup |
+| `setToolJSX` | Injects arbitrary React UI from a tool into the REPL bottom slot |
+| `addNotification` | Posts a banner notification visible in the REPL |
+| `onCompactProgress` | Lifecycle callbacks that update the spinner during compaction |
+| `renderedSystemPrompt` | Set after `buildEffectiveSystemPrompt` returns; shared with fork subagents so they reuse the parent's prompt cache hit |
+| `contentReplacementState` | Per-thread budget tracking for tool result truncation |
+| `setInProgressToolUseIDs` | Tracks which tools are currently executing (drives spinner rendering) |
+| `setHasInterruptibleToolInProgress` | Signals the REPL whether the current tool can be safely interrupted by Escape |
+| `resume` | Callback to restart a session after `SessionEnd` hooks |
+| `requestPrompt` | (HOOK_PROMPTS feature) Blocks query until the user answers a hook-injected question |
+
+> **Why `getAppState()` instead of direct closure capture?** Each turn produces ~30 `setMessages` calls. If `onQueryImpl` closed over React state directly, every state update would force the closure — and every tool bound to it — to capture a stale snapshot. `getToolUseContext` reads `store.getState()` (Zustand, not React) which is always fresh, making tool reads consistent across the entire turn even as the transcript grows.
+
+---
+
+### `systemPrompt` — Assembly Pipeline
+
+**Sources:** `getSystemPrompt()` (`constants/prompts.ts` line 444) → `buildEffectiveSystemPrompt()` (`utils/systemPrompt.ts` line 41)  
+**Type:** `readonly string[]` (branded `SystemPrompt`)
+
+The system prompt is an **ordered array of string sections**, not a single string. Sections are kept separate so the API layer can apply caching boundaries and so `buildEffectiveSystemPrompt` can splice in agent/coordinator overrides at the right positions.
+
+#### `getSystemPrompt()` — section composition
+
+Returns `string[]` with two logical halves:
+
+**Static / cacheable sections** (before `SYSTEM_PROMPT_DYNAMIC_BOUNDARY`):
+- Identity + capabilities intro
+- System constraints (OS, shell, CWD)
+- Doing-tasks guidance
+- Actions / tool-usage instructions
+- Tone & style, output efficiency
+
+**Dynamic sections** (resolved per-turn via `resolveSystemPromptSections`):
+
+| Section key | Content | Cached? |
+|-------------|---------|---------|
+| `session_guidance` | Active slash-command list, enabled tool set | Per session |
+| `memory` | `loadMemoryPrompt()` — contents of `memdir/` files | Per call |
+| `env_info_simple` | CWD, git branch, platform, shell, OS, model name | Per call |
+| `language` | Locale / language instruction from settings | Per session |
+| `output_style` | Output style config (compact, verbose, etc.) | Per session |
+| `mcp_instructions` | Per-server instruction blocks from connected MCPs | Per call (servers come/go) |
+| `scratchpad` | Scratchpad tool instructions (if enabled) | Per session |
+| `frc` | Function-result-clearing instructions for model | Static |
+| `summarize_tool_results` | Heuristics for when to summarize tool output | Static |
+| `token_budget` | Token budget instructions (`TOKEN_BUDGET` feature flag) | Per call |
+| `ant_model_override` | Internal model override section (ant builds only) | Per session |
+| `numeric_length_anchors` | Token-reduction anchors (ant builds only) | Static |
+
+#### `buildEffectiveSystemPrompt()` — priority override logic
+
+Selects which prompt to use based on runtime context (priority: highest first):
+
+| Condition | Result |
+|-----------|--------|
+| `overrideSystemPrompt` set (bridge/loop mode) | Replaces everything; `appendSystemPrompt` ignored |
+| `COORDINATOR_MODE` feature + env var | `getCoordinatorSystemPrompt()` + `appendSystemPrompt` |
+| Agent definition is proactive (KAIROS) | `defaultSystemPrompt` + agent prompt + `appendSystemPrompt` |
+| Agent definition is non-proactive | Agent prompt replaces `defaultSystemPrompt` |
+| `customSystemPrompt` (`--system-prompt` flag) | Replaces `defaultSystemPrompt` |
+| Default | `defaultSystemPrompt` + optional `appendSystemPrompt` |
+
+The result is stored in `toolUseContext.renderedSystemPrompt` so subagent forks can share the same cached prompt bytes with the parent turn.
+
+---
+
+### `userContext` — CLAUDE.md + Date Injection
+
+**Built by:** `getUserContext()` (`context.ts` line 155) + coordinator/focus overrides  
+**Type:** `{ [k: string]: string }`  
+**Memoized:** yes — cache cleared when `setSystemPromptInjection()` is called
+
+`getUserContext()` returns:
+
+| Key | Value | Omitted when |
+|-----|-------|--------------|
+| `claudeMd` | Contents of all CLAUDE.md files found by walking the cwd (via `getMemoryFiles`) | `CLAUDE_CODE_DISABLE_CLAUDE_MDS` set, or `--bare` with no `--add-dir` |
+| `currentDate` | `"Today's date is YYYY-MM-DD."` | Never |
+
+After the base call, `onQueryImpl` merges in:
+- `getCoordinatorUserContext()` — coordinator-specific key/value pairs when MCP coordinator mode is active
+- `{ terminalFocus: '…' }` — injected in KAIROS proactive mode when the terminal window is not focused, so the model knows it is operating in the background
+
+**How `userContext` reaches the API — `prependUserContext()`** (`utils/api.ts` line 449):
+
+Rather than adding user context to the system prompt, `prependUserContext` inserts a **synthetic `isMeta: true` user message** as the very first message in the conversation array:
+
+```
+<system-reminder>
+As you answer the user's questions, you can use the following context:
+# claudeMd
+<file contents>
+# currentDate
+Today's date is YYYY-MM-DD.
+
+IMPORTANT: this context may or may not be relevant…
+</system-reminder>
+```
+
+This approach keeps the user context out of the cacheable system prompt prefix (which changes rarely) while still making it model-visible on every turn.
+
+---
+
+### `systemContext` — Git Status + Cache Breaker
+
+**Built by:** `getSystemContext()` (`context.ts` line 116)  
+**Type:** `{ [k: string]: string }`  
+**Memoized:** yes — cache cleared alongside `userContext`
+
+| Key | Value | Omitted when |
+|-----|-------|--------------|
+| `gitStatus` | Current branch, default branch, `git status --short`, last 5 commits, git user name. Truncated at 2,000 chars. | CCR (remote) mode, or git instructions disabled |
+| `cacheBreaker` | `"[CACHE_BREAKER: <injection>]"` | `BREAK_CACHE_COMMAND` feature off, or injection not set |
+
+**How `systemContext` reaches the API — `appendSystemContext()`** (`utils/api.ts` line 437):
+
+`appendSystemContext` appends the key/value pairs as `"key: value\n"` lines to the **end of the `systemPrompt` array** (not the messages). This placement keeps the dynamic git snapshot in the system prompt rather than the user turn, separating it from the CLAUDE.md content that goes through `prependUserContext`.
+
+```
+systemPrompt (after appendSystemContext):
+  [ ...static sections..., ...dynamic sections...,
+    "gitStatus: On branch main\n...",
+    "cacheBreaker: [CACHE_BREAKER: ...]"   ← only when feature on
+  ]
+```
+
+> **Why split between `systemContext` and `userContext`?** The system prompt is sent once and benefits from API-level caching across turns. Appending the git snapshot there (as `systemContext`) keeps it in the cached prefix when it hasn't changed. The CLAUDE.md content (as `userContext`) is prepended to the message array instead, making it easy to invalidate per-turn without busting the system prompt cache.
+
+---
+
 ## Stream Event Handling (`onQueryEvent`, line 2584)
 
 Calls `handleMessageFromStream(event, ...)` from `utils/messages.ts`, then updates state:
