@@ -65,6 +65,8 @@ classDiagram
     ask --> QueryEngine : creates and delegates to
 ```
 
+
+
 ---
 
 ## `submitMessage()` Pipeline
@@ -196,11 +198,11 @@ ask(params):
 
 **3 — Two paths for applying the snip.** The REPL and the SDK handle snip boundaries differently because they have different constraints:
 
-| | REPL | SDK / headless (`ask()`) |
-|---|---|---|
-| Goal | Keep full history for UI scrollback | Bound memory — no UI needs the old messages |
-| Approach | **Project** a filtered view at API-call time | **Actually remove** snipped messages from `mutableMessages` |
-| Function | `projectSnippedView()` inside `getMessagesAfterCompactBoundary()` | `snipCompactIfNeeded()` via `snipReplay` callback |
+|          | REPL                                                              | SDK / headless (`ask()`)                                    |
+| -------- | ----------------------------------------------------------------- | ----------------------------------------------------------- |
+| Goal     | Keep full history for UI scrollback                               | Bound memory — no UI needs the old messages                 |
+| Approach | **Project** a filtered view at API-call time                      | **Actually remove** snipped messages from `mutableMessages` |
+| Function | `projectSnippedView()` inside `getMessagesAfterCompactBoundary()` | `snipCompactIfNeeded()` via `snipReplay` callback           |
 
 **REPL path.** `getMessagesAfterCompactBoundary()` calls `projectSnippedView(messages)` every time it builds the API payload. This filters snipped messages on-the-fly but leaves `AppState.messages` untouched so the user can still scroll up and see the full history.
 
@@ -226,21 +228,21 @@ The boundary message itself is consumed by the `break` — it never enters `muta
 
 Messages yielded by `submitMessage()`:
 
-| type | subtype | When |
-|---|---|---|
-| `system` | _(init)_ | Once per `submitMessage()` call; carries tools, model, permissions, skills |
-| `user` | — | User message replay (when `replayUserMessages`) |
-| `assistant` | — | Each assistant content block |
-| `progress` | — | Tool-execution progress events |
-| `stream_event` | — | Raw API stream events (only if `includePartialMessages`) |
-| `attachment` | — | File snapshots, memory attachments, queued commands |
-| `tool_use_summary` | — | Haiku-generated summary of a tool batch |
-| `system` | `compact_boundary` | Context-window compaction completed |
-| `system` | `api_retry` | Retryable API error; includes attempt/delay metadata |
-| `result` | `success` | Turn completed normally |
-| `result` | `error_max_turns` | `maxTurns` reached |
-| `result` | `error_max_budget_usd` | `maxBudgetUsd` exceeded |
-| `result` | `error_max_structured_output_retries` | Structured-output retry limit hit |
-| `result` | `error_during_execution` | Unexpected terminal state (includes diagnostic errors[]) |
+| type               | subtype                               | When                                                                       |
+| ------------------ | ------------------------------------- | -------------------------------------------------------------------------- |
+| `system`           | _(init)_                              | Once per `submitMessage()` call; carries tools, model, permissions, skills |
+| `user`             | —                                     | User message replay (when `replayUserMessages`)                            |
+| `assistant`        | —                                     | Each assistant content block                                               |
+| `progress`         | —                                     | Tool-execution progress events                                             |
+| `stream_event`     | —                                     | Raw API stream events (only if `includePartialMessages`)                   |
+| `attachment`       | —                                     | File snapshots, memory attachments, queued commands                        |
+| `tool_use_summary` | —                                     | Haiku-generated summary of a tool batch                                    |
+| `system`           | `compact_boundary`                    | Context-window compaction completed                                        |
+| `system`           | `api_retry`                           | Retryable API error; includes attempt/delay metadata                       |
+| `result`           | `success`                             | Turn completed normally                                                    |
+| `result`           | `error_max_turns`                     | `maxTurns` reached                                                         |
+| `result`           | `error_max_budget_usd`                | `maxBudgetUsd` exceeded                                                    |
+| `result`           | `error_max_structured_output_retries` | Structured-output retry limit hit                                          |
+| `result`           | `error_during_execution`              | Unexpected terminal state (includes diagnostic errors[])                   |
 
 All `result` messages include: `duration_ms`, `duration_api_ms`, `num_turns`, `stop_reason`, `session_id`, `total_cost_usd`, `usage`, `modelUsage`, `permission_denials`, `fast_mode_state`.
