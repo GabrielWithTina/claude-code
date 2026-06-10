@@ -42,7 +42,7 @@ flowchart TD
     F --> G["strip safe wrappers (timeout/nice/env…)"]
     G --> H{"is a known path command?"}
     H -->|no| PASS["passthrough"]
-    H -->|yes| I["PATH_EXTRACTORS[cmd](args)"]
+    H -->|yes| I["path extractor for command args"]
     I --> J["per-command validators + cd-compound + dangerous-removal"]
     J --> K["validatePath() each path vs allowed dirs"]
     K -->|outside| ASK
@@ -52,15 +52,16 @@ flowchart TD
 
 ## Path Extraction
 
-`PATH_EXTRACTORS` is a `Record<PathCommand, (args) => string[]>` covering ~63
-commands. Different commands carry paths in different argument positions, so each
-has bespoke logic. Shared infrastructure:
+`PATH_EXTRACTORS` maps each `PathCommand` to an argument-extractor function for
+about 63 commands. Different commands carry paths in different argument
+positions, so each has bespoke logic. Shared infrastructure:
 
 - **`filterOutFlags(args)`** — drops `-flags`, but correctly honors `--`
   (end-of-options): after `--`, everything is positional even if it starts with
   `-`. This defeats `rm -- -/../.claude/settings.json`.
-- **`parsePatternCommand(...)`** — for `grep`/`rg`-style `cmd [flags] PATTERN
-  [files…]`, tracking which flags consume an argument.
+- **`parsePatternCommand(...)`** — for `grep`/`rg`-style commands with optional
+  flags, a required pattern, and optional files, tracking which flags consume an
+  argument.
 
 Examples:
 

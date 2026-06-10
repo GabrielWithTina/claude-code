@@ -9,7 +9,8 @@ The Task-related tools cover two separate task concepts:
 
 This directory documents both layers and calls out their boundary. It does not
 cover `AgentTool`'s legacy tool alias named `Task`; that delegation subsystem is
-documented in [agenttool](../agenttool/README.md).
+documented in
+[agenttool](../../delegation-teams-agent-runtime/agenttool/README.md).
 
 | File | Covers |
 |---|---|
