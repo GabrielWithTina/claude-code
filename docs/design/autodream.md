@@ -1,6 +1,6 @@
 # AutoDream: Background Memory Consolidation
 
-AutoDream is a background service that periodically spawns a forked subagent (the "dream agent") to read recent session transcripts and consolidate memories into the user's memory directory. It runs as a post-sampling hook at the end of each REPL turn — lightweight unless all gates pass.
+AutoDream is a background service that periodically spawns a forked subagent (the "dream agent") to read recent session transcripts and consolidate memories into the user's memory directory. It is fired from the stop-hook path for main-thread turns — lightweight unless all gates pass.
 
 ---
 
@@ -43,7 +43,7 @@ flowchart TD
 
 **Gate 3 — Lock.** `tryAcquireConsolidationLock()` writes the current PID to `.consolidate-lock` in the memory directory, then reads back to verify it won the race. Returns `priorMtime` (for rollback) on success, `null` if blocked. Stale lock detection: if the lock is held by a PID that `isProcessRunning()` returns false for, it is reclaimed. Locks older than 1 hour are considered stale even if the PID is live (PID reuse guard). If the body is unparseable, the lock is also reclaimed within the 1-hour window.
 
-**Force override.** An internal `isForced()` function (always `false` in external builds, overridable in ant builds) bypasses the precondition and Gates 1–2 but **not** Gate 3. Under force, the lock is not acquired — the existing `lastAt` is used as `priorMtime` so a kill's rollback is a no-op. The session scan still runs to populate prompt hints.
+**Force override.** An internal `isForced()` function (always `false` in external builds, overridable in ant builds) bypasses the precondition, time gate, scan throttle, session-count check, and lock acquisition. Under force, the existing `lastAt` is used as `priorMtime` so a kill's rollback is a no-op. The session scan still runs to populate prompt hints.
 
 ---
 
@@ -115,9 +115,13 @@ The dream agent runs via `runForkedAgent()` with a restricted `canUseTool` predi
 
 | Tool | Access |
 |------|--------|
-| `FileEditTool` | Allowed (memory dir only) |
-| `FileWriteTool` | Allowed (memory dir only) |
-| `BashTool` | Read-only commands only (`ls`, `find`, `grep`, `cat`, `stat`, `wc`, `head`, `tail`) |
+| `REPLTool` | Allowed; inner primitive tool calls are checked again by the same `canUseTool` path |
+| `FileReadTool` | Allowed |
+| `GrepTool` | Allowed |
+| `GlobTool` | Allowed |
+| `FileEditTool` | Allowed only for paths inside the auto-memory directory |
+| `FileWriteTool` | Allowed only for paths inside the auto-memory directory |
+| `BashTool` | Read-only commands only (`ls`, `find`, `grep`, `cat`, `stat`, `wc`, `head`, `tail`, and similar) |
 | Everything else | Denied |
 
 The `canUseTool` restriction is enforced at the `runForkedAgent` layer, not via the tool registry. The dream agent cannot write outside the memory directory or run stateful shell commands.

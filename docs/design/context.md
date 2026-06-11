@@ -147,7 +147,7 @@ API call:
 2. **User** — `~/.claude/CLAUDE.md` and `~/.claude/rules/*.md`. Private global instructions for all projects.
 3. **Project** — `CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/rules/*.md` discovered by walking from CWD upward to the filesystem root. Files closer to CWD have higher priority (loaded later, more attention from the model).
 4. **Local** — `CLAUDE.local.md` in each directory on the same upward walk. Gitignored; user-private project instructions.
-5. **AutoMem** — `memdir/memory.md` entrypoint (when auto-memory is enabled). User's consolidated long-term memory.
+5. **AutoMem** — auto-memory `MEMORY.md` entrypoint (when auto-memory is enabled). User's consolidated long-term memory.
 6. **TeamMem** — team memory entrypoint (when TEAMMEM feature is on).
 
 ### Discovery Flowchart
@@ -172,7 +172,7 @@ flowchart TD
     L -- yes --> M[Load from each --add-dir:\ndir/CLAUDE.md\ndir/.claude/CLAUDE.md\ndir/.claude/rules/*.md]
     L -- no --> N{isAutoMemoryEnabled?}
     M --> N
-    N -- yes --> O[Load AutoMem:\nmemdir/memory.md]
+    N -- yes --> O[Load AutoMem:\nauto-memory MEMORY.md]
     N -- no --> P{TEAMMEM feature?}
     O --> P
     P -- yes --> Q[Load TeamMem entrypoint]

@@ -99,9 +99,8 @@ function isGateOpen(): boolean {
   return isAutoDreamEnabled()
 }
 
-// Ant-build-only test override. Bypasses enabled/time/session gates but NOT
-// the lock (so repeated turns don't pile up dreams) or the memory-dir
-// precondition. Still scans sessions so the prompt's session-hint is populated.
+// Ant-build-only test override. Bypasses enabled/time/session gates and lock
+// acquisition. Still scans sessions so the prompt's session-hint is populated.
 function isForced(): boolean {
   return false
 }
