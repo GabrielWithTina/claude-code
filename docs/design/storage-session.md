@@ -523,6 +523,13 @@ directory mention, IDE selection, or opened-file context. The model later sees
 that preloaded context as user-role metadata, but the source row remains an
 `attachment` transcript entry.
 
+When inputting `@file/directory` in a user input, a subsequent content block with `role: user/system` are generated including the content of the file by using `Read` tool. In real case, it might be incorporated into
+the previous user message if appliable. (**IMHO, I would put it in a separate content block as it indeeds a
+part of user input). Here are the sample content block:
+
+> Called the Read tool with the following input: {\"file_path\":\"/home/xiaos/git/gabriel/python/forward-proxy/src/forward_proxy/main.py\"}
+Result of calling the Read tool:...
+
 In the sample session, there are no `file`, `directory`,
 `compact_file_reference`, `pdf_reference`, `edited_text_file`,
 `selected_lines_in_ide`, or `opened_file_in_ide` attachment entries. The project
@@ -578,6 +585,8 @@ corresponding environment gate is enabled.
 ## Metadata Entries
 
 ### `ai-title`
+
+This is used for session title by calling a haiku model for fast generation.
 
 ```json
 {
