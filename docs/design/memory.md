@@ -32,13 +32,13 @@ the broader memory system.
 
 ## Memory Stores
 
-| Store              | Scope                                               | File shape                                           | Loaded by                                                          | Written by                          |
-| ------------------ | --------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------- |
-| Instruction memory | Managed, user, project, local                       | `CLAUDE.md`, `.claude/rules/*.md`, `CLAUDE.local.md` | `getMemoryFiles()` -> `getClaudeMds()`                             | User or `/memory` editor            |
-| Auto-memory        | Project by canonical git root                       | `MEMORY.md` index plus topic `.md` files             | `loadMemoryPrompt()`, `getMemoryFiles()`, relevant-memory prefetch | Main agent, extractor, AutoDream    |
-| Team memory        | Project, under auto-memory                          | `team/MEMORY.md` plus team files                     | `getMemoryFiles()`, team prompt paths                              | Main agent, extractor, sync service |
-| Agent memory       | Agent type with `user`, `project`, or `local` scope | `MEMORY.md` plus topic files                         | `loadAgentMemoryPrompt()`                                          | Agent with memory enabled           |
-| Session memory     | Current session only                                | `session-memory/summary.md`                          | Session-memory compact path                                        | Session-memory fork or `/summary`   |
+| Store                  | Scope                                               | File shape                                           | Loaded by                                                          | Written by                          |
+| ---------------------- | --------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------- |
+| **Instruction memory** | Managed, user, project, local                       | `CLAUDE.md`, `.claude/rules/*.md`, `CLAUDE.local.md` | `getMemoryFiles()` -> `getClaudeMds()`                             | User or `/memory` editor            |
+| **Auto-memory**        | Project by canonical git root                       | `MEMORY.md` index plus topic `.md` files             | `loadMemoryPrompt()`, `getMemoryFiles()`, relevant-memory prefetch | Main agent, extractor, AutoDream    |
+| **Team memory**        | Project, under auto-memory                          | `team/MEMORY.md` plus team files                     | `getMemoryFiles()`, team prompt paths                              | Main agent, extractor, sync service |
+| **Agent memory**       | Agent type with `user`, `project`, or `local` scope | `MEMORY.md` plus topic files                         | `loadAgentMemoryPrompt()`                                          | Agent with memory enabled           |
+| **Session memory**     | Current session only                                | `session-memory/summary.md`                          | Session-memory compact path                                        | Session-memory fork or `/summary`   |
 
 Important scope distinction:
 
@@ -52,29 +52,27 @@ repo-specific. Agent memory is keyed by agent type and selected scope because a
 custom agent may need reusable behavior across repositories or checkout-local
 state for one repository.
 
-
-
 ## When the memory are generated
 
-- Instruction memory: User proactively do this (edit file or use `/init` command)
+- **Instruction memory: User proactively do this (edit file or use `/init` command)**
 
-- Auto memory:
+- **Auto memory:**
 
-  - User request
+  - **User request**
 
-  - After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.
+  - **After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.**
 
-- Team memory:
+- **Team memory:**
 
-  - After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.
+  - **After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.**
 
-- Agent memory:
+- **Agent memory:**
 
-  - For memory-enabled sub agent, in the agent prompt, it contains a dedicated memory prompt for this task.
+  - **For memory-enabled sub agent, in the agent prompt, it contains a dedicated memory prompt for this task.**
 
-- Session memory:
+- **Session memory:**
 
-  - After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.
+  - **After every turn, the stop hook triggers the activity, if it is eligible, a forked sub agent is created for this task.**
 
 ---
 
@@ -675,8 +673,10 @@ Default thresholds from `DEFAULT_SESSION_MEMORY_CONFIG`:
 
 1. If session memory is not initialized, require current context tokens to be
    at least `minimumMessageTokensToInit`, then mark initialized.
+
 2. Always require token growth since last extraction to meet
    `minimumTokensBetweenUpdate`.
+
 3. Also require either:
 
    - tool calls since the last update >= `toolCallsBetweenUpdates`, or
