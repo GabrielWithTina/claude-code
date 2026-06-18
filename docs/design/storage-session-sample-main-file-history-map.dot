@@ -1,0 +1,127 @@
+// Focused file-history map for the sample main-agent session.
+// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
+//
+// Render example:
+//   dot -Tsvg docs/design/storage-session-sample-main-file-history-map.dot -o /tmp/storage-session-sample-main-file-history-map.svg
+//
+// Why this file exists:
+//   The full append-log graph has 515 nodes and several relationship types, which makes
+//   the rendered SVG hard to read. This focused graph shows only the file-history
+//   snapshot entries, the transcript messages they reference, and the tracked backup
+//   states those snapshots record.
+//
+// Edge legend:
+//   black solid   = snapshot append order
+//   orange dashed = file-history-snapshot.messageId
+//   red dotted    = file-history-snapshot.snapshot.messageId for update entries
+//   purple solid  = tracked file backup state recorded by that snapshot
+
+digraph sample_main_session_file_history_map {
+  graph [
+    label="Sample main-agent file-history snapshot map\ncd51bba4-3e67-4577-9a9c-1293e0100eff",
+    labelloc=t,
+    fontsize=22,
+    rankdir=LR,
+    splines=true,
+    concentrate=false,
+    nodesep=0.45,
+    ranksep=0.75
+  ];
+
+  node [fontname="Menlo", fontsize=10, margin="0.08,0.05"];
+  edge [fontname="Menlo", fontsize=9, arrowsize=0.65];
+
+  subgraph cluster_snapshots {
+    label="file-history-snapshot JSONL entries";
+    color="#dddddd";
+    style="rounded";
+
+    fh002 [label="L002 FILE HISTORY\nbase\nmessageId=aa6082e8\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh008 [label="L008 FILE HISTORY\nbase\nmessageId=2c7b6c0e\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh085 [label="L085 FILE HISTORY\nbase\nmessageId=31fe1d82\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh096 [label="L096 FILE HISTORY\nupdate\nmessageId=202469bd\nsnapshot.messageId=31fe1d82\ntracked=1", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
+    fh118 [label="L118 FILE HISTORY\nbase\nmessageId=9f9344a3\ntracked=1", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh135 [label="L135 FILE HISTORY\nupdate\nmessageId=d9dae2bb\nsnapshot.messageId=9f9344a3\ntracked=2", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
+    fh160 [label="L160 FILE HISTORY\nbase\nmessageId=f3a60c2f\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh445 [label="L445 FILE HISTORY\nbase\nmessageId=f5078f39\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh450 [label="L450 FILE HISTORY\nbase\nmessageId=7769c29c\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh485 [label="L485 FILE HISTORY\nbase\nmessageId=9fc35f88\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh501 [label="L501 FILE HISTORY\nbase\nmessageId=88a467b7\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+
+    fh002 -> fh008;
+    fh008 -> fh085;
+    fh085 -> fh096;
+    fh096 -> fh118;
+    fh118 -> fh135;
+    fh135 -> fh160;
+    fh160 -> fh445;
+    fh445 -> fh450;
+    fh450 -> fh485;
+    fh485 -> fh501;
+  }
+
+  subgraph cluster_messages {
+    label="referenced transcript messages";
+    color="#dddddd";
+    style="rounded";
+
+    msg006 [label="L006 aa6082e8\nUSER\n/clear command", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg009 [label="L009 2c7b6c0e\nUSER\nCreate FastAPI language reference guide app", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg086 [label="L086 31fe1d82\nUSER\nkeep it minimal, lang-reference-guide is fine", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg095 [label="L095 202469bd\nASSIST\ntool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
+    msg117 [label="L117 9f9344a3\nUSER\nApproved", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg134 [label="L134 d9dae2bb\nASSIST\ntool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
+    msg161 [label="L161 f3a60c2f\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg446 [label="L446 f5078f39\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg448 [label="L448 7769c29c\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg486 [label="L486 9fc35f88\nUSER\nList the full tasks in this session", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg500 [label="L500 88a467b7\nUSER\nShow me current session ID", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+  }
+
+  subgraph cluster_file_states {
+    label="tracked file backup states";
+    color="#dddddd";
+    style="rounded";
+
+    no_files [label="trackedFileBackups = {}", shape=note, style="filled", fillcolor="#f5f5f5"];
+    spec_null [label="spec/design.md\nbackupFileName=null\nversion=1\npre-write state: file did not exist", shape=note, style="filled", fillcolor="#f5f5ff"];
+    spec_v2 [label="spec/design.md\nda8c25ed54b72cc4@v2\nversion=2", shape=note, style="filled", fillcolor="#f5f5ff"];
+    plan_null [label="plan.md\nbackupFileName=null\nversion=1\npre-write state: file did not exist", shape=note, style="filled", fillcolor="#f5f5ff"];
+    plan_v2 [label="plan.md\n407d6e14c9eed3f5@v2\nversion=2", shape=note, style="filled", fillcolor="#f5f5ff"];
+  }
+
+  // Snapshot order is already shown in the snapshot cluster. The following edges
+  // show each snapshot's storage references.
+
+  fh002 -> msg006 [color="#e68632", style="dashed", label="messageId"];
+  fh008 -> msg009 [color="#e68632", style="dashed", label="messageId"];
+  fh085 -> msg086 [color="#e68632", style="dashed", label="messageId"];
+  fh096 -> msg095 [color="#e68632", style="dashed", label="messageId"];
+  fh096 -> msg086 [color="#cc3333", style="dotted", penwidth=2, label="snapshot.messageId"];
+  fh118 -> msg117 [color="#e68632", style="dashed", label="messageId"];
+  fh135 -> msg134 [color="#e68632", style="dashed", label="messageId"];
+  fh135 -> msg117 [color="#cc3333", style="dotted", penwidth=2, label="snapshot.messageId"];
+  fh160 -> msg161 [color="#e68632", style="dashed", label="messageId"];
+  fh445 -> msg446 [color="#e68632", style="dashed", label="messageId"];
+  fh450 -> msg448 [color="#e68632", style="dashed", label="messageId"];
+  fh485 -> msg486 [color="#e68632", style="dashed", label="messageId"];
+  fh501 -> msg500 [color="#e68632", style="dashed", label="messageId"];
+
+  fh002 -> no_files [color="#8a5fbf", label="tracked"];
+  fh008 -> no_files [color="#8a5fbf", label="tracked"];
+  fh085 -> no_files [color="#8a5fbf", label="tracked"];
+  fh096 -> spec_null [color="#8a5fbf", label="tracked"];
+  fh118 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh135 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh135 -> plan_null [color="#8a5fbf", label="tracked"];
+  fh160 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh160 -> plan_v2 [color="#8a5fbf", label="tracked"];
+  fh445 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh445 -> plan_v2 [color="#8a5fbf", label="tracked"];
+  fh450 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh450 -> plan_v2 [color="#8a5fbf", label="tracked"];
+  fh485 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh485 -> plan_v2 [color="#8a5fbf", label="tracked"];
+  fh501 -> spec_v2 [color="#8a5fbf", label="tracked"];
+  fh501 -> plan_v2 [color="#8a5fbf", label="tracked"];
+}

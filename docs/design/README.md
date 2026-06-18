@@ -147,6 +147,14 @@ sequenceDiagram
 | [repl.md](./repl.md) | `screens/REPL.tsx` — interactive terminal component, query loop, state model, input handling, permissions, hooks |
 | [query-engine.md](./query-engine.md) | `QueryEngine` — session lifecycle, `submitMessage()` pipeline, budget control, SDK message types (headless/SDK path only) |
 | [query-loop.md](./query-loop.md) | `query()` — LLM streaming loop, tool execution, compaction, token budgets, error recovery |
+| [messages.md](./messages.md) | Internal/UI messages, SDK/bridge messages, Anthropic API message payloads, and conversion boundaries |
+| [future-message-layer-poc.md](./future-message-layer-poc.md) | Future POC for a channel-neutral canonical conversation event layer between UI channels, SDK protocol, and LLM API payloads |
+| [storage.md](./storage.md) | Storage architecture map across transcripts, memory, config, settings, plugins, MCP, tasks, caches, and artifacts |
+| [storage-session.md](./storage-session.md) | Session JSONL storage, transcript fields, metadata entries, subagent files, sidecars, and sample-derived field catalog |
+| [storage-session-sample-main.md](./storage-session-sample-main.md) | Visual guide and diagram index for the sample main-agent JSONL transcript |
+| [storage-config-settings.md](./storage-config-settings.md) | Global config, settings sources, managed policy, project config, and auth-related storage |
+| [storage-extensions-mcp.md](./storage-extensions-mcp.md) | Plugin installation metadata, marketplace registry, plugin data dirs, MCP config, and MCP auth cache |
+| [storage-runtime-artifacts.md](./storage-runtime-artifacts.md) | Prompt history, live session registry, TodoV2 tasks, scheduled tasks, task output, stats, policy, and cache files |
 | [context.md](./context.md) | System-prompt assembly, CLAUDE.md loading, git status, cache boundary |
 | [memory.md](./memory.md) | Memory system: CLAUDE.md instruction memory, auto-memory, team memory, agent memory, session memory, storage and load paths |
 | [tool-system.md](./tool-system.md) | `Tool` interface, `ToolUseContext`, `buildTool()`, registry assembly (`getTools`, `assembleToolPool`) |

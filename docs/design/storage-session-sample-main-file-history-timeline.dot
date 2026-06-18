@@ -1,0 +1,138 @@
+// Readable timeline/table view for file-history snapshots in the sample main-agent session.
+// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
+//
+// Render example:
+//   dot -Tsvg docs/design/storage-session-sample-main-file-history-timeline.dot -o /tmp/storage-session-sample-main-file-history-timeline.svg
+//
+// This is intentionally a table diagram, not an edge graph. The edge graph version
+// is faithful, but it is hard to read because file-history snapshots repeatedly
+// point at the same message/file-state nodes.
+
+digraph sample_main_session_file_history_timeline {
+  graph [
+    label="Sample main-agent file-history snapshot timeline\ncd51bba4-3e67-4577-9a9c-1293e0100eff",
+    labelloc=t,
+    fontsize=22,
+    rankdir=TB
+  ];
+
+  node [shape=plain, fontname="Menlo"];
+
+  timeline [
+    label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
+        <TR>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>JSONL line</B></FONT></TD>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Entry kind</B></FONT></TD>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>messageId target</B></FONT></TD>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>snapshot.messageId target</B></FONT></TD>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Tracked backup state</B></FONT></TD>
+          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Meaning</B></FONT></TD>
+        </TR>
+
+        <TR>
+          <TD>L002</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L006 aa6082e8<BR/>USER /clear</TD>
+          <TD>SAME</TD>
+          <TD>{}</TD>
+          <TD>Initial restorable user-message checkpoint; no files tracked yet.</TD>
+        </TR>
+        <TR>
+          <TD>L008</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L009 2c7b6c0e<BR/>USER create FastAPI app</TD>
+          <TD>SAME</TD>
+          <TD>{}</TD>
+          <TD>First real prompt checkpoint; no file-history-aware writes yet.</TD>
+        </TR>
+        <TR>
+          <TD>L085</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L086 31fe1d82<BR/>USER keep it minimal</TD>
+          <TD>SAME</TD>
+          <TD>{}</TD>
+          <TD>Checkpoint before the turn that creates the design spec.</TD>
+        </TR>
+        <TR>
+          <TD>L096</TD>
+          <TD BGCOLOR="#ffd0b0"><B>update</B></TD>
+          <TD>L095 202469bd<BR/>ASSIST tool_use:Write</TD>
+          <TD>L086 31fe1d82<BR/>USER keep it minimal</TD>
+          <TD>spec/design.md = null, v1</TD>
+          <TD>Write created a new spec file. Null means the pre-write state was "file did not exist".</TD>
+        </TR>
+        <TR>
+          <TD>L118</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L117 9f9344a3<BR/>USER Approved</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2</TD>
+          <TD>Next checkpoint captures the existing spec file contents as the first physical backup blob.</TD>
+        </TR>
+        <TR>
+          <TD>L135</TD>
+          <TD BGCOLOR="#ffd0b0"><B>update</B></TD>
+          <TD>L134 d9dae2bb<BR/>ASSIST tool_use:Write</TD>
+          <TD>L117 9f9344a3<BR/>USER Approved</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = null, v1</TD>
+          <TD>Write created a new plan file and updates the latest base snapshot.</TD>
+        </TR>
+        <TR>
+          <TD>L160</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L161 f3a60c2f<BR/>USER 1</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
+          <TD>Next checkpoint captures the existing plan file contents as a physical backup blob.</TD>
+        </TR>
+        <TR>
+          <TD>L445</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L446 f5078f39<BR/>USER 1</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
+          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
+        </TR>
+        <TR>
+          <TD>L450</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L448 7769c29c<BR/>USER 1</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
+          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
+        </TR>
+        <TR>
+          <TD>L485</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L486 9fc35f88<BR/>USER list full tasks</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
+          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
+        </TR>
+        <TR>
+          <TD>L501</TD>
+          <TD BGCOLOR="#ffe0cc">base</TD>
+          <TD>L500 88a467b7<BR/>USER show session ID</TD>
+          <TD>SAME</TD>
+          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
+          <TD>Latest observed checkpoint reuses unchanged backup metadata.</TD>
+        </TR>
+      </TABLE>
+    >
+  ];
+
+  legend [
+    label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
+        <TR><TD BGCOLOR="#eeeeee"><B>Path abbreviation</B></TD><TD BGCOLOR="#eeeeee"><B>Full path in trackedFileBackups</B></TD></TR>
+        <TR><TD>spec/design.md</TD><TD>docs/superpowers/specs/2026-06-03-lang-reference-guide-design.md</TD></TR>
+        <TR><TD>plan.md</TD><TD>docs/superpowers/plans/2026-06-03-lang-reference-guide.md</TD></TR>
+        <TR><TD>null</TD><TD>No physical blob. The file did not exist at the captured pre-write state.</TD></TR>
+        <TR><TD>SAME</TD><TD>For base snapshots, top-level messageId and snapshot.messageId point to the same user message.</TD></TR>
+      </TABLE>
+    >
+  ];
+
+  timeline -> legend [style=invis];
+}
