@@ -523,12 +523,23 @@ directory mention, IDE selection, or opened-file context. The model later sees
 that preloaded context as user-role metadata, but the source row remains an
 `attachment` transcript entry.
 
-When inputting `@file/directory` in a user input, a subsequent content block with `role: user/system` are generated including the content of the file by using `Read` tool. In real case, it might be incorporated into
-the previous user message if appliable. (**IMHO, I would put it in a separate content block as it indeeds a
-part of user input). Here are the sample content block:
+For an `@file` mention, attachment extraction reads the path through the same
+file-reading machinery used by `FileReadTool`. API normalization then converts a
+`file` attachment into synthetic `FileReadTool`-style context: a tool-use-shaped
+user message followed by a tool-result-shaped user message containing the file
+content. If the previous normalized message is already a user message, that
+generated context may be merged into the previous user turn before the final API
+payload is built.
 
 > Called the Read tool with the following input: {\"file_path\":\"/home/xiaos/git/gabriel/python/forward-proxy/src/forward_proxy/main.py\"}
 Result of calling the Read tool:...
+
+Media has two related paths. Pasted images are usually stored directly on the
+real `UserMessage.content` as Anthropic `image` blocks, not as attachment
+messages. File attachments, however, can normalize file-read outputs whose data
+type is `text`, `image`, `notebook`, or `pdf`. Large `@`-mentioned PDFs can use a
+lightweight `pdf_reference` attachment instead of inlining the document; the
+normalized reminder tells the model to read specific page ranges with `Read`.
 
 In the sample session, there are no `file`, `directory`,
 `compact_file_reference`, `pdf_reference`, `edited_text_file`,

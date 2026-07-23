@@ -6,6 +6,10 @@
 
 `query()` wraps `queryLoop()`, which contains the `while(true)` main loop. The outer wrapper exists solely to fire `notifyCommandLifecycle('completed')` on any consumed slash commands when the loop exits normally.
 
+For a source-order, statement-level walkthrough of the complete
+`queryLoop()` implementation, see
+[Query Loop Internals](./query-loop-internals.md).
+
 ---
 
 ## Public Interface
@@ -99,6 +103,41 @@ flowchart TD
     AD -- no --> AF([return completed])
 ```
 
+### API stream events
+
+`stream_event` carries a raw Anthropic streaming event. It originates in the
+API layer rather than being synthesized by QueryEngine or a tool. As
+`services/api/claude.ts` iterates the API stream, it first updates its local
+response assembly state for events such as `message_start`,
+`content_block_start`, `content_block_delta`, `content_block_stop`,
+`message_delta`, and `message_stop`. It then wraps every raw event and yields it
+alongside higher-level internal messages (`services/api/claude.ts:1940-2303`):
+
+```ts
+yield {
+  type: 'stream_event',
+  event: part,
+  ...(part.type === 'message_start' ? { ttftMs } : undefined),
+}
+```
+
+The two output forms serve different purposes. `content_block_stop` produces an
+assembled `assistant` message that can enter conversation history, while
+`stream_event` preserves the granular transport lifecycle and content deltas.
+Consequently, one model response normally produces many `stream_event` values
+as well as one or more assembled `assistant` messages. The query loop forwards
+both through its generic yield path (`query.ts:700-863`).
+
+QueryEngine consumes stream events even when callers did not request partial
+output. It uses `message_start` to initialize current-response usage,
+`message_delta` to update usage and capture the final `stop_reason`, and
+`message_stop` to accumulate that usage into the session total
+(`QueryEngine.ts:788-816`). Only when `includePartialMessages` is enabled does
+it re-emit the raw event as an SDK `stream_event`
+(`QueryEngine.ts:818-825`). Stream events are transient transport state: they
+are not appended to `mutableMessages`, converted into model context, or written
+to the persistent session transcript.
+
 ---
 
 ## Tool Execution Flow
@@ -108,13 +147,16 @@ Tool calls arrive as `tool_use` blocks inside an assistant message. Two parallel
 - **StreamingToolExecutor** (default, `config.gates.streamingToolExecution`): tools begin executing as soon as their `tool_use` block appears in the stream. Results are yielded via `getCompletedResults()` interleaved with the ongoing stream.
 - **`runTools()`** (fallback): executes all tools after the stream finishes.
 
-Both paths call `canUseTool` per tool to enforce permission mode, and both produce `UserMessage` or `AttachmentMessage` tool-result objects that are appended to `toolResults` for the next iteration.
+Both paths route every tool through the shared permission-resolution path,
+which invokes `canUseTool` when required. Both produce `UserMessage` or
+`AttachmentMessage` tool-result objects that are appended to `toolResults` for
+the next iteration.
 
 ```mermaid
 flowchart LR
     A[Stream arrives\ntool_use block] --> B{streamingToolExecution\nenabled?}
     B -- yes --> C[StreamingToolExecutor.addTool]
-    C --> D[canUseTool check]
+    C --> D[permission resolution]
     D -- approved --> E[execute tool async]
     D -- denied --> F[synthetic error result]
     E --> G{result\nready?}
@@ -130,6 +172,111 @@ flowchart LR
 ```
 
 When the abort controller fires during tool execution, `StreamingToolExecutor.getRemainingResults()` generates synthetic error results for any in-flight tools so the message history never has an unmatched `tool_use` block.
+
+### `canUseTool`: injected authorization boundary
+
+`canUseTool` is an asynchronous authorization callback, not a boolean flag.
+`query()` receives it through `QueryParams`, but does not implement permission
+policy itself. This lets the same query loop use an interactive permission UI,
+an SDK permission-prompt mechanism, a restricted subagent policy, or a
+deterministic test implementation.
+
+```ts
+type CanUseToolFn = (
+  tool: Tool,
+  input: Record<string, unknown>,
+  toolUseContext: ToolUseContext,
+  assistantMessage: AssistantMessage,
+  toolUseID: string,
+  forceDecision?: PermissionDecision,
+) => Promise<PermissionDecision>
+```
+
+The arguments identify both the requested operation and its execution context:
+the tool definition, schema-validated model input, current permission/app
+state, originating assistant message, and the `tool_use` ID that will link the
+request to its result. The optional `forceDecision` carries a decision already
+produced by another mechanism, such as a hook. The decision is a discriminated
+union:
+
+| Behavior | Effect |
+|---|---|
+| `allow` | Execute the tool. `updatedInput`, when present, replaces the input used for execution. |
+| `deny` | Do not execute the tool; produce an error `tool_result` containing the denial reason. |
+| `ask` | Request an interactive or host-mediated decision. If no mechanism resolves it, it remains non-allowed. |
+
+The callback participates in the following path:
+
+```text
+model tool_use
+  -> StreamingToolExecutor / runTools()
+  -> runToolUse()
+  -> run PreToolUse hooks
+  -> resolveHookPermissionDecision()
+  -> canUseTool(...) when required
+  -> allow: tool.call(...)
+     deny/ask: error tool_result, without calling the tool
+```
+
+`resolveHookPermissionDecision()` combines hook output with normal permission
+policy (`services/tools/toolHooks.ts:321-405`). A hook `allow` does not override
+explicit settings-based `deny` or `ask` rules. Tools that require user
+interaction, and contexts with `requireCanUseTool`, must still pass through
+`canUseTool`; otherwise an eligible hook approval can avoid an additional
+interactive prompt while remaining subject to rule-based checks.
+
+The concrete callback depends on the caller. Interactive REPL mode constructs
+it with `useCanUseTool()`, which evaluates `hasPermissionsToUseTool()` and
+routes unresolved `ask` decisions to interactive, coordinator, or swarm-worker
+handlers (`hooks/useCanUseTool.tsx:27-180`). Headless mode can use configured
+rules directly or delegate `ask` decisions to an SDK/stdio permission prompt
+(`cli/print.ts:4145-4263`). QueryEngine wraps the supplied callback to collect
+non-allow decisions as `SDKPermissionDenial` records for its final result
+(`QueryEngine.ts:243-271`).
+
+After approval, `runToolUse()` passes the same callback into `tool.call()`
+(`services/tools/toolExecution.ts:1206-1222`). Composite tools can therefore
+apply the same authorization boundary to nested operations rather than
+bypassing the caller's permission policy.
+
+### Progress messages
+
+A `progress` message is local tool-execution status, not content emitted by the
+model stream. A tool that supports incremental updates calls the `onProgress`
+callback passed to `tool.call()`. For example, `BashTool` reports intermediate
+output as `bash_progress` while its command generator is still running
+(`tools/BashTool/BashTool.tsx:663-677`); `AgentTool` similarly reports nested
+assistant/tool activity as `agent_progress`
+(`tools/AgentTool/AgentTool.tsx:1110-1123`).
+
+The callback follows this path:
+
+```text
+tool.call(..., onProgress)
+  -> checkPermissionsAndCallTool() receives the update
+  -> streamedCheckPermissionsAndCallTool() wraps it with createProgressMessage()
+  -> runToolUse() yields MessageUpdateLazy
+  -> runTools() / StreamingToolExecutor forwards the update
+  -> query() yields update.message to its caller
+```
+
+`createProgressMessage()` adds `type: 'progress'`, a UUID, timestamp, the
+progress update's own `toolUseID`, and the enclosing tool call's
+`parentToolUseID` (`utils/messages.ts:603-619`). The wrapping callback is in
+`services/tools/toolExecution.ts:521-555`; the fallback orchestration path
+forwards it through `services/tools/toolOrchestration.ts:19-82`. The final
+query-loop emission is the generic `yield update.message` at
+`query.ts:1384-1400`, so `query()` does not special-case progress while yielding
+tool updates.
+
+Progress is not appended to `toolResults` as model-facing context:
+`normalizeMessagesForAPI()` does not turn it into a `user` tool-result message.
+It is live UI/SDK state associated with the parent tool call. QueryEngine keeps
+it in `mutableMessages` and passes it through SDK normalization; for example,
+eligible `bash_progress` and `powershell_progress` updates become throttled
+`tool_progress` SDK events (`utils/queryHelpers.ts:120-202`). Persistent session
+storage explicitly excludes progress from transcript entries and the
+`parentUuid` chain (`utils/sessionStorage.ts:130-155`).
 
 ---
 

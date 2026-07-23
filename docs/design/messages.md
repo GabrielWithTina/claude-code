@@ -73,7 +73,7 @@ switch statements:
 | `user` | `createUserMessage()` | User input, synthetic user caveats, slash-command breadcrumbs, tool results, compact summaries, bridge-origin text. Holds an Anthropic-style `{ role: 'user', content }` payload plus local metadata. |
 | `assistant` | `createAssistantMessage()` / model response handling | Assistant output with Anthropic assistant `message` payload, usage, error fields, request id, timestamp, UUID, virtual flag. |
 | `system` | `createSystemMessage()` and specialized helpers | Local system events: informational notices, permission retries, bridge status, local command output, compact boundaries, API retry errors, metrics, memory notices, hook summaries. Most are filtered before the API. |
-| `attachment` | attachment helpers | File snapshots, plan-mode exits, structured output, queued commands, memory/context attachments. Attachments are often projected into user content during API normalization or used only for rendering. |
+| `attachment` | attachment helpers | File/directory references, changed-file notices, plan-mode exits, structured output, queued commands, memory/context attachments. Attachments are often projected into user content during API normalization or used only for rendering; see [Attachment Transcript Entries](./storage-session.md#attachment-transcript-entries). |
 | `progress` | `createProgressMessage()` | Tool-execution progress for UI. Not sent to the API. |
 | `stream_event` | query/remote stream handling | Adjacent raw Anthropic stream event for partial rendering. Not persisted as model context. |
 | `tool_use_summary` | `createToolUseSummaryMessage()` | Adjacent human-readable summary of a completed tool batch for SDK/headless consumers. |
