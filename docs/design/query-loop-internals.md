@@ -33,8 +33,8 @@ callback, limits, and injectable dependencies. `consumedCommandUuids` is an
 out-parameter owned by `query()`: the loop appends IDs when queued commands
 become attachments, and the wrapper marks them complete after normal exit.
 
-The caller does not send actions through `next(value)`. Injected callbacks and
-`ToolUseContext` provide capabilities; yielded values report observable work.
+**The caller does not send actions through `next(value)`. Injected callbacks and**
+**`ToolUseContext` provide capabilities; yielded values report observable work.**
 
 ---
 
@@ -236,8 +236,8 @@ does not create a visible user turn and does not guarantee injection.
 `query.ts:323-335`, `query.ts:1617-1628`)
 
 Skill discovery has a different lifetime. The module is loaded only when the
-compile-time `EXPERIMENTAL_SKILL_SEARCH` feature exists, and one prefetch is
-started at the top of each loop iteration rather than once per user turn:
+compile-time `EXPERIMENTAL_SKILL_SEARCH` feature exists, and **one prefetch is**
+**started at the top of each loop iteration rather than once per user turn:**
 
 ```ts
 startSkillDiscoveryPrefetch(null, messages, toolUseContext)
@@ -404,6 +404,135 @@ flowchart TD
     I -- no --> K[Replace State]
     K --> A
 ```
+
+### End-to-end sequence
+
+This sequence connects the whole user-turn lifecycle. Internal branches of
+compaction, hooks, result budgeting, and individual tools remain in their
+owning sections; this view emphasizes overlap and the gates between model
+iterations.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller as REPL / QueryEngine caller
+    participant Q as queryLoop
+    participant Mem as Memory prefetch
+    participant Skill as Skill prefetch
+    participant API as Anthropic API
+    participant Exec as StreamingToolExecutor
+    participant Pipe as runToolUse / permissions
+    participant Tool as Tool.call
+
+    Caller->>Q: Start or request next generator value
+    Q->>Mem: startRelevantMemoryPrefetch(messages, context)
+    Note over Q,Mem: Starts once per user turn, Q retains the Promise without awaiting it
+
+    loop while true: one model iteration
+        Q->>Skill: startSkillDiscoveryPrefetch(...)
+        Note over Q,Skill: Starts at the top of each eligible iteration
+        Q-->>Caller: yield stream_request_start
+        Q->>Q: Prepare messages and context
+        Note over Q: compact boundary, result budget, snip,<br/>microcompact, collapse projection, autocompact
+
+        alt Context preparation requests another iteration
+            Q->>Q: Replace state and continue
+        else Context is ready
+            Q->>API: callModel(..., turn abort signal)
+
+            loop For each streamed model event
+                API-->>Q: Text, thinking, tool_use, usage, or error event
+                Q-->>Caller: yield visible stream update
+
+                opt Event contains tool_use blocks
+                    Q->>Exec: addTool(block, assistantMessage)
+                    Exec->>Exec: Append queued tool and call processQueue()
+                    alt Tool is eligible to start
+                        Exec->>Pipe: runToolUse(block, child abort controller)
+                        Pipe->>Pipe: Validate input, run hooks, request permission
+                        Pipe->>Tool: call(input, context, progress callback)
+                        Note over Exec,Tool: collectResults() retains the pending Promise,<br/>model-stream consumption does not await tool completion
+                    else Exclusive ordering barrier
+                        Exec->>Exec: Leave tool queued until prior work completes
+                    end
+                end
+
+                Q->>Exec: getCompletedResults()
+                Exec-->>Q: Currently buffered progress/results only
+                Note over Q,Exec: Non-blocking poll, an executing exclusive tool<br/>may stop this poll without stopping the model stream
+                Q-->>Caller: yield available progress or tool results
+            end
+
+            alt Model call fails or requires retry/fallback
+                Q->>Q: Repair stream, change model, compact,<br/>or replace state when recoverable
+                alt Recovery continues
+                    Q->>Q: continue with replacement state
+                else Failure is terminal
+                    Q-->>Caller: yield error and return Terminal
+                end
+            else Model stream completes
+                Q->>Q: Run post-stream ordering and abort checks
+
+                alt Turn abort signal is set
+                    Q->>Exec: getRemainingResults()
+                    Exec->>Tool: Propagate abort through child controllers
+                    Tool-->>Exec: Abort/error when implementation honors signal
+                    Exec-->>Q: Real or synthetic result for every tool_use
+                    Q-->>Caller: yield interruption/tool-result messages
+                    Q-->>Caller: return aborted Terminal
+
+                else No tool_use blocks
+                    alt Recovery, stop hook, or budget branch continues
+                        Q->>Q: Replace state and continue
+                    else Normal completion
+                        Q-->>Caller: yield final messages and return completed Terminal
+                    end
+
+                else One or more tool_use blocks
+                    Q->>Exec: getRemainingResults()
+                    loop Until every tracked tool is yielded
+                        Exec->>Exec: processQueue() starts newly eligible tools
+                        alt Progress or completed result is ready
+                            Exec-->>Q: Yield progress/result incrementally
+                            Q-->>Caller: yield message
+                        else Executing tools remain
+                            Exec->>Exec: await Promise.race(tool promises, progress promise)
+                            Note over Q,Exec: Suspends this async caller chain,<br/>the shared event loop remains available
+                        end
+                    end
+
+                    Note over Q,Exec: No next model request until all current tool calls<br/>have real or synthetic terminal results
+                    Q->>Q: Normalize and accumulate all tool results
+                    Q->>Q: Run tool summary and post-tool abort handling
+                    Q->>Q: Assemble ordinary attachments
+
+                    opt Memory prefetch has settled and was not consumed
+                        Q->>Mem: Read settled Promise without waiting
+                        Mem-->>Q: Deduplicated memory attachments
+                    end
+                    opt Skill prefetch exists
+                        Q->>Skill: collectSkillDiscoveryPrefetch(handle)
+                        Skill-->>Q: Skill-discovery attachments
+                    end
+
+                    Q-->>Caller: yield attachment messages
+                    Q->>Q: Replace state with history, assistant messages,<br/>tool results, and attachments
+                    Q->>Q: continue to next model iteration
+                end
+            end
+        end
+    end
+```
+
+The overlapping work above is implemented with promises and async generators,
+not by assigning every tool a JavaScript thread. Model streaming, prefetches,
+and concurrency-safe tool calls can all be in flight at once. Their JavaScript
+continuations normally share Bun's event loop, while subprocesses, remote
+services, and operating-system I/O may do underlying work in parallel. An
+`await` suspends only its current async caller chain. In particular,
+`await Promise.race(...)` inside `getRemainingResults()` leaves the event loop
+responsive but prevents `queryLoop()` from starting the next model request
+until the surrounding drain loop has yielded every tracked tool.
 
 ---
 
@@ -1108,8 +1237,8 @@ Four iteration-local accumulators are created:
 - `toolUseBlocks`: every observed tool request;
 - `needsFollowUp`: reliable tool-continuation signal.
 
-The code does not trust `stop_reason === 'tool_use'`; observing a real
-`tool_use` block sets `needsFollowUp`.
+**The code does not trust `stop_reason === 'tool_use'`; observing a real**
+**`tool_use` block sets `needsFollowUp`.**
 
 If streaming tool execution is enabled, `StreamingToolExecutor` is created
 before the API call. Otherwise blocks are collected for `runTools()`. Runtime
