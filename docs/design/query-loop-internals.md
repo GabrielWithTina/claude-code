@@ -435,13 +435,15 @@ sequenceDiagram
         Q->>Q: Prepare messages and context
         Note over Q: compact boundary, result budget, snip,<br/>microcompact, collapse projection, autocompact
 
-        alt Context preparation requests another iteration
-            Q->>Q: Replace state and continue
-        else Context is ready
-            Q->>API: callModel(..., turn abort signal)
+        Q->>API: callModel(..., turn abort signal)
 
             loop For each streamed model event
                 API-->>Q: Text, thinking, tool_use, usage, or error event
+                opt callModel reports a streaming fallback
+                    Q-->>Caller: Tombstone partial assistant messages
+                    Q->>Q: Clear partial assistant/tool accumulators
+                    Q->>Exec: Discard old executor and create a fresh one
+                end
                 Q-->>Caller: yield visible stream update
 
                 opt Event contains tool_use blocks
@@ -463,13 +465,14 @@ sequenceDiagram
                 Q-->>Caller: yield available progress or tool results
             end
 
-            alt Model call fails or requires retry/fallback
-                Q->>Q: Repair stream, change model, compact,<br/>or replace state when recoverable
-                alt Recovery continues
-                    Q->>Q: continue with replacement state
-                else Failure is terminal
-                    Q-->>Caller: yield error and return Terminal
-                end
+            alt FallbackTriggeredError and fallbackModel exists
+                Q->>Q: Select fallback model and clear partial accumulators
+                Q->>Exec: Discard old executor and create a fresh one
+                Q-->>Caller: yield model-switch warning
+                Q->>API: Retry callModel() in the inner API loop
+            else Another exception escapes callModel
+                Q-->>Caller: yield missing tool results and API error
+                Q-->>Caller: return image_error or model_error Terminal
             else Model stream completes
                 Q->>Q: Run post-stream ordering and abort checks
 
@@ -520,7 +523,6 @@ sequenceDiagram
                     Q->>Q: continue to next model iteration
                 end
             end
-        end
     end
 ```
 
