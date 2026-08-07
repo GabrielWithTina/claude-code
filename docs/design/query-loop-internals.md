@@ -536,6 +536,215 @@ services, and operating-system I/O may do underlying work in parallel. An
 responsive but prevents `queryLoop()` from starting the next model request
 until the surrounding drain loop has yielded every tracked tool.
 
+## Budget and limit model
+
+`queryLoop()` handles several controls that all use words such as “budget,”
+“tokens,” or “limit,” but they constrain different resources and have different
+owners. They must not be treated as interchangeable.
+
+| Control | Scope | Unit | Direction | Primary owner | Result when reached |
+|---|---|---:|---|---|---|
+| Aggregate tool-result budget | One normalized API user-message group | Characters | Maximum | `queryLoop()` and `applyToolResultBudget()` | Persist selected large results and send previews. |
+| Context-window capacity | One model request | Context tokens | Maximum | Compaction/collapse pipeline and `queryLoop()` | Reduce history, retry after reactive compaction, or return `blocking_limit`/`prompt_too_long`. |
+| API `task_budget` | Whole agentic user turn | Task tokens | Planning allowance | API/model, with carryover supplied by `queryLoop()` | Model can pace the task; `queryLoop()` does not locally stop at zero. |
+| Client-side token budget | Whole main-agent user turn | Output tokens | Minimum target | REPL state and `queryLoop()` | Inject a hidden continuation nudge while productive output is below the target. |
+| Per-response output limit | One `callModel()` response | Output tokens | Maximum | API request plus `queryLoop()` recovery | Retry with a larger cap or continue from partial output. |
+| Maximum turns | One `queryLoop()` invocation | Model iterations | Maximum | `queryLoop()` | Yield `max_turns_reached` and return `max_turns`. |
+
+The nesting is:
+
+```text
+whole user task / queryLoop invocation
+  ├─ API task_budget
+  ├─ client-side output-token target
+  ├─ maxTurns
+  └─ model iteration / API request
+       ├─ context-window capacity
+       ├─ per-response max_tokens
+       └─ normalized user message
+            └─ aggregate tool-result character budget
+```
+
+### Aggregate tool-result character budget
+
+This budget controls how much eligible tool-result text can enter one
+normalized API user-message group. Its default is 200,000 characters, with a
+positive finite `tengu_hawthorn_window` override. If fresh eligible results
+would exceed the limit, the largest are persisted to disk and replaced with
+stable previews.
+
+It is a prompt-shaping budget, not a tool-execution budget: tools have already
+run, and their results still exist on disk. It is also distinct from each
+tool's `maxResultSizeChars`, which protects against one individually enormous
+result. The complete selection, persistence, replay, and cache-stability
+algorithm is documented under
+[Tool-result budget](#tool-result-budget-queryts369-394).
+
+### Context-window capacity
+
+The context window constrains what one API request can contain. Before
+`callModel()`, the loop progressively applies:
+
+```text
+compact-boundary cut
+  -> aggregate tool-result budgeting
+  -> history snip
+  -> microcompaction
+  -> context-collapse projection
+  -> proactive autocompaction
+```
+
+If no enabled compaction owner can handle a context already at the hard
+blocking threshold, `calculateTokenWarningState()` causes an immediate
+`blocking_limit` terminal (`query.ts:592-647`). A server prompt-too-long or
+media rejection can later trigger collapse-drain or reactive-compaction retry
+(`query.ts:1065-1183`). Context capacity is a per-request maximum; it does not
+measure how much output work the model has performed over the whole user turn.
+
+### API `task_budget`: model-visible planning allowance
+
+`task_budget` tells the API/model the token allowance for the entire agentic
+task so the model can pace exploration, execution, verification, and
+completion across requests. It is sent in `output_config`:
+
+```json
+{
+  "task_budget": {
+    "type": "tokens",
+    "total": 100000,
+    "remaining": 40000
+  }
+}
+```
+
+`total` is the original allowance. `remaining` is normally omitted while the
+server can see the complete, uncompacted trajectory and calculate its own
+countdown. Compaction creates the exceptional case:
+
+```text
+task budget total                         100,000
+final context immediately before compact -60,000
+explicit remaining after compact          40,000
+```
+
+If 60,000 tokens of visible history become an 8,000-token summary, sending only
+`total` could make the shortened transcript look like an almost-new task.
+`queryLoop()` therefore calls `finalContextTokensFromLastResponse()` before
+proactive or reactive compaction and carries the true remainder forward. A
+later compact subtracts from the prior remainder, with zero as the floor.
+
+This is context-based task awareness, not billing spend. It is also not a
+local loop condition: the recovered client sends `total`/`remaining`, but has
+no `if (remaining === 0) return` branch. The API/model owns the resulting
+pacing behavior. Relevant locations are `query.ts:282-291`, `query.ts:504-515`,
+`query.ts:699-705`, `query.ts:1135-1146`, and
+`services/api/claude.ts:468-501`.
+
+### Client-side token budget: minimum output target
+
+The feature-gated client budget is activated by user text such as `+500k` or
+`spend 2M tokens`. At turn start, the REPL snapshots cumulative session output;
+current-turn usage is then:
+
+```text
+getTurnOutputTokens()
+  = total session output now - total session output at turn start
+```
+
+Only model **output tokens** count toward this target. Input tokens,
+cache-read input tokens, and cache-creation input tokens are excluded. For
+example:
+
+```text
+input tokens          50,000
+cache-read tokens    100,000
+output tokens          6,000
+client token target   10,000
+
+budget progress = 6,000 / 10,000 = 60%
+```
+
+The apparently larger aggregate API usage does not satisfy the target because
+the feature measures generated output/work rather than request cost or context
+size. The implementation is direct: `getTurnOutputTokens()` subtracts the
+output-token snapshot captured at turn start from `getTotalOutputTokens()`; it
+never reads the input or cache counters.
+
+When the model attempts a no-tool completion below 90% of the requested target,
+`checkTokenBudget()` adds a hidden user message and continues the outer loop:
+
+```text
+Stopped at 30% of token target (3,000 / 10,000).
+Keep working — do not summarize.
+```
+
+For a 10,000-token target, an illustrative trajectory is:
+
+```text
+iteration 1: cumulative 3,000  -> continue
+iteration 2: cumulative 5,500  -> continue
+iteration 3: cumulative 9,100  -> permit completion
+```
+
+It is a minimum productive-work target, not a maximum. To avoid an unproductive
+loop, continuation stops for diminishing returns after at least three nudges
+when both the current and preceding increments are below 500 tokens. Subagents
+do not use this check. Unlike `task_budget`, this mechanism is entirely local:
+it measures output usage, injects `token_budget_continuation`, and directly
+controls whether `queryLoop()` accepts an early no-tool finish. See
+`bootstrap/state.ts:724-743`, `query/tokenBudget.ts:3-92`, and
+`query.ts:1308-1355`.
+
+### Per-response output-token limit
+
+Every `callModel()` request includes `max_tokens`, a maximum for that single
+model response. The effective value is selected in this precedence order:
+
+```text
+retry-context override
+  -> queryLoop maxOutputTokensOverride
+  -> model/configured default
+```
+
+A normal response may finish below the limit. If the API instead reports
+`stop_reason: max_tokens`, the streaming layer emits an internal
+`max_output_tokens` error that `queryLoop()` initially withholds so recovery
+can remain invisible to SDK callers.
+
+Recovery has two levels:
+
+1. When the experimental default-slot cap made the first request 8,000 tokens,
+   and no explicit environment override exists, retry the same history once
+   with `maxOutputTokensOverride = 64_000`.
+2. If escalation is unavailable or the larger response is also cut off,
+   preserve the partial assistant output, append a hidden “resume directly”
+   instruction, and start another model iteration. At most three such
+   continuation recoveries are allowed.
+
+The 8k-to-64k escalation is a clean retry and does not consume one of the three
+continuation attempts. When recovery is exhausted, the withheld error is
+finally surfaced. `model_context_window_exceeded` deliberately enters the same
+continuation path because the response was likewise cut off. See
+`services/api/claude.ts:1590-1594`, `services/api/claude.ts:2266-2290`, and
+`query.ts:1185-1256`.
+
+### Maximum agentic turns
+
+`maxTurns` counts model/tool follow-up iterations rather than tokens. Before a
+new tool-follow-up iteration begins, and on the aborted-tool path, the loop
+checks whether the next count would exceed the caller's limit. If so it yields
+`max_turns_reached` and returns a `max_turns` terminal instead of calling the
+model again (`query.ts:1506-1513`, `query.ts:1704-1711`).
+
+### Deliberate exclusions
+
+`maxBudgetUsd` is a monetary session control, but it is not enforced inside
+`queryLoop()`. `QueryEngine` checks accumulated cost outside this lower-level
+generator. Per-tool persistence thresholds and memory/skill attachment limits
+also bound prompt material, but they belong to their producing subsystems; the
+table above focuses on controls that participate directly in query-loop state,
+request construction, recovery, or termination.
+
 ---
 
 ## 1. Enter an iteration (`query.ts:306-364`)
