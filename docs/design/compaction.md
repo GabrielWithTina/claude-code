@@ -436,6 +436,106 @@ flowchart TD
 
 The marble_origami guard's string is wrapped in `feature('CONTEXT_COLLAPSE')` so that even the literal `'marble_origami'` is DCE'd from external builds — `excluded-strings.txt` enforces this.
 
+### `autoCompactIfNeeded()` detailed sequence
+
+`autoCompactIfNeeded()` (`autoCompact.ts:241-350`) is the orchestration boundary. It does not construct the compact summary itself. It decides whether compaction may run, gives session-memory compaction the first opportunity, delegates the LLM path to `compactConversation()`, and converts failures into tracking state for the next query-loop iteration.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant QL as queryLoop<br/>query.ts
+    participant AC as autoCompactIfNeeded<br/>autoCompact.ts:241-350
+    participant SA as shouldAutoCompact<br/>autoCompact.ts:160-239
+    participant CFG as Config, feature gates,<br/>token helpers
+    participant SM as trySessionMemoryCompaction<br/>sessionMemoryCompact.ts
+    participant CC as compactConversation<br/>compact.ts
+    participant CA as Compaction model call<br/>forked agent or streaming fallback
+    participant CL as Post-compact state<br/>cleanup and markers
+
+    QL->>AC: await autoCompactIfNeeded(messages, context,<br/>cacheSafeParams, querySource, tracking,<br/>snipTokensFreed)
+    AC->>CFG: isEnvTruthy(DISABLE_COMPACT)
+    CFG-->>AC: disabled?
+    alt DISABLE_COMPACT is truthy<br/>autoCompact.ts:253-255
+        AC-->>QL: { wasCompacted: false }
+    else compaction is globally enabled
+        AC->>AC: Read tracking.consecutiveFailures
+        alt failures are at least 3<br/>autoCompact.ts:257-265
+            Note over AC: Circuit breaker suppresses all later work
+            AC-->>QL: { wasCompacted: false }
+        else circuit remains closed
+            AC->>AC: model = context.options.mainLoopModel
+            AC->>SA: await shouldAutoCompact(messages, model,<br/>querySource, snipTokensFreed)
+            SA->>CFG: Check recursion guards<br/>session_memory, compact, marble_origami
+            SA->>CFG: Check global and user auto-compact settings
+            SA->>CFG: Check reactive-only and context-collapse suppression
+            alt any guard or suppression applies
+                CFG-->>SA: ineligible
+                SA-->>AC: false
+            else eligible mode
+                SA->>CFG: tokenCountWithEstimation(messages)<br/>minus snipTokensFreed
+                SA->>CFG: calculateTokenWarningState(tokenCount, model)
+                CFG-->>SA: isAboveAutoCompactThreshold
+                SA-->>AC: threshold result
+            end
+
+            alt shouldCompact is false<br/>autoCompact.ts:275-277
+                AC-->>QL: { wasCompacted: false }
+            else shouldCompact is true
+                AC->>AC: Build RecompactionInfo from tracking,<br/>threshold, and querySource
+                AC->>SM: await trySessionMemoryCompaction(messages,<br/>agentId, autoCompactThreshold)
+                Note over SM: Internal feature and environment gates run first.<br/>A usable memory must produce a result below the threshold.
+
+                alt session-memory compaction succeeds<br/>autoCompact.ts:293-310
+                    SM-->>AC: CompactionResult
+                    AC->>CL: setLastSummarizedMessageId(undefined)
+                    AC->>CL: runPostCompactCleanup(querySource)
+                    opt PROMPT_CACHE_BREAK_DETECTION feature
+                        AC->>CL: notifyCompaction(querySource or compact, agentId)
+                    end
+                    AC->>CL: markPostCompaction()
+                    AC-->>QL: { wasCompacted: true,<br/>compactionResult: sessionMemoryResult }
+                else SM disabled, unavailable, empty, or result too large
+                    SM-->>AC: null
+                    AC->>CC: await compactConversation(messages, context,<br/>cacheSafeParams, suppressQuestions=true,<br/>customInstructions=undefined,<br/>isAutoCompact=true, recompactionInfo)
+                    CC->>CC: Run PreCompact hooks and build compact prompt
+                    CC->>CA: Request summary
+                    alt cache-sharing fork succeeds
+                        CA-->>CC: Summary using parent prompt-cache prefix
+                    else fork unavailable or fails
+                        CC->>CA: Retry through isolated streaming fallback
+                        CA-->>CC: Summary or error
+                    end
+
+                    alt compactConversation resolves<br/>autoCompact.ts:313-333
+                        CC->>CC: Format summary, restore attachments,<br/>run compact hooks, build CompactionResult
+                        CC-->>AC: CompactionResult
+                        AC->>CL: setLastSummarizedMessageId(undefined)
+                        AC->>CL: runPostCompactCleanup(querySource)
+                        AC-->>QL: { wasCompacted: true,<br/>compactionResult, consecutiveFailures: 0 }
+                    else compactConversation throws<br/>autoCompact.ts:334-349
+                        CC--xAC: error
+                        alt error is not user abort
+                            AC->>CL: logError(error)
+                        else exact user-abort error
+                            Note over AC: Do not emit error log
+                        end
+                        AC->>AC: nextFailures = previous failures + 1
+                        opt nextFailures are at least 3
+                            AC->>CL: Log circuit-breaker warning
+                        end
+                        AC-->>QL: { wasCompacted: false,<br/>consecutiveFailures: nextFailures }
+                    end
+                end
+            end
+        end
+    end
+```
+
+Two asymmetries are intentional:
+
+- Session-memory success does not return `consecutiveFailures: 0`; only the full `compactConversation()` success path explicitly resets it (`autoCompact.ts:328-333`). The query loop replaces its broader tracking state after any successful compaction.
+- The `try`/`catch` begins only around `compactConversation()` (`autoCompact.ts:312`). An exception thrown by `shouldAutoCompact()` or `trySessionMemoryCompaction()` is not converted into `{ wasCompacted: false }` by this function; it propagates to its caller.
+
 ### Circuit breaker
 
 `MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES = 3` (`autoCompact.ts:70`). Threaded through `AutoCompactTrackingState.consecutiveFailures`:
@@ -466,6 +566,144 @@ When the threshold is breached, `autoCompactIfNeeded` calls `trySessionMemoryCom
 6. **Builds the boundary marker** with `preCompactDiscoveredTools` for deferred-tool state preservation.
 7. Runs **PostCompact** hooks.
 8. Returns a `CompactionResult`.
+
+### `compactConversation()` detailed sequence
+
+The following diagram follows `compactConversation()` in source order (`compact.ts:387-763`). All work occurs inside one outer `try`; any thrown error transfers control to the `catch`, and the `finally` progress reset runs after both success and failure.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Caller as Auto or manual<br/>compact caller
+    participant CC as compactConversation<br/>compact.ts:387-763
+    participant UI as Progress and SDK status<br/>callbacks
+    participant Hooks as Hook subsystem
+    participant SUM as streamCompactSummary
+    participant PTL as PTL retry helpers
+    participant ATT as Attachment builders
+    participant CTX as Context and session state
+    participant TEL as Telemetry and markers
+
+    Caller->>CC: await compactConversation(messages, context,<br/>cacheSafeParams, suppressFollowUpQuestions,<br/>customInstructions, isAutoCompact, recompactionInfo)
+
+    alt messages is empty<br/>compact.ts:397-399
+        CC->>CC: throw ERROR_MESSAGE_NOT_ENOUGH_MESSAGES
+    else messages are available
+        CC->>CC: preCompactTokenCount = tokenCountWithEstimation(messages)
+        CC->>CTX: getAppState()
+        CC->>TEL: logPermissionContextForAnts()
+
+        CC->>UI: onCompactProgress(hooks_start, pre_compact)
+        CC->>UI: setSDKStatus(compacting)
+        CC->>Hooks: await executePreCompactHooks(trigger,<br/>customInstructions, abortSignal)
+        Hooks-->>CC: newCustomInstructions and userDisplayMessage
+        CC->>CC: mergeHookInstructions(user, hook)
+        CC->>UI: setStreamMode(requesting)<br/>reset response length<br/>onCompactProgress(compact_start)
+
+        CC->>CTX: Read tengu_compact_cache_prefix
+        CC->>CC: getCompactPrompt(merged instructions)<br/>create summaryRequest user message
+
+        loop Summary request and prompt-too-long recovery<br/>compact.ts:450-491
+            CC->>SUM: await streamCompactSummary(messagesToSummarize,<br/>summaryRequest, context, cacheSafeParams)
+            Note over SUM: Prefer cache-sharing fork.<br/>Fall back to isolated streaming request.
+            SUM-->>CC: assistant summaryResponse
+            CC->>CC: getAssistantMessageText(summaryResponse)
+
+            alt response is not prompt_too_long
+                Note over CC: Exit retry loop
+            else response is prompt_too_long
+                CC->>CC: Increment ptlAttempts
+                CC->>PTL: truncateHeadForPTLRetry(messagesToSummarize,<br/>summaryResponse), at most 3 retries
+                alt truncation cannot produce a retry set
+                    PTL-->>CC: null
+                    CC->>TEL: log tengu_compact_failed(prompt_too_long)
+                    CC->>CC: throw ERROR_MESSAGE_PROMPT_TOO_LONG
+                else retry set is available
+                    PTL-->>CC: truncated messages
+                    CC->>TEL: log tengu_compact_ptl_retry
+                    CC->>CC: messagesToSummarize = truncated
+                    CC->>CC: retryCacheSafeParams.forkContextMessages = truncated
+                end
+            end
+        end
+
+        alt summary text is empty<br/>compact.ts:493-506
+            CC->>TEL: Log debugging and tengu_compact_failed(no_summary)
+            CC->>CC: throw no-summary error
+        else summary starts with API error prefix<br/>compact.ts:507-515
+            CC->>TEL: log tengu_compact_failed(api_error)
+            CC->>CC: throw summary as Error
+        else usable summary text
+            CC->>CTX: Snapshot readFileState
+            CC->>CTX: Clear readFileState and loadedNestedMemoryPaths
+
+            par Restore recently read files
+                CC->>ATT: createPostCompactFileAttachments(snapshot, context, maxFiles)
+                ATT-->>CC: fileAttachments
+            and Capture asynchronous-agent state
+                CC->>ATT: createAsyncAgentAttachmentsIfNeeded(context)
+                ATT-->>CC: asyncAgentAttachments
+            end
+
+            CC->>ATT: createPlanAttachmentIfNeeded(agentId)
+            ATT-->>CC: optional plan attachment
+            CC->>ATT: await createPlanModeAttachmentIfNeeded(context)
+            ATT-->>CC: optional plan-mode attachment
+            CC->>ATT: createSkillAttachmentIfNeeded(agentId)
+            ATT-->>CC: optional invoked-skills attachment
+            CC->>ATT: Rebuild deferred-tool, agent-listing,<br/>and MCP-instruction delta attachments
+
+            CC->>UI: onCompactProgress(hooks_start, session_start)
+            CC->>Hooks: await processSessionStartHooks(compact, model)
+            Hooks-->>CC: hookMessages
+
+            CC->>CC: createCompactBoundaryMessage(auto or manual,<br/>preCompactTokenCount, last message UUID)
+            CC->>CTX: extractDiscoveredToolNames(messages)
+            opt deferred tools were discovered before compaction
+                CC->>CC: Save sorted names in<br/>boundary.compactMetadata.preCompactDiscoveredTools
+            end
+            CC->>CC: Build text summary message with transcript path<br/>and compact-summary flags
+
+            CC->>CC: Derive compact-call token total,<br/>resulting-context estimate, and API usage
+            CC->>TEL: log tengu_compact with usage,<br/>recompaction, and context metrics
+            opt PROMPT_CACHE_BREAK_DETECTION feature
+                CC->>TEL: notifyCompaction(querySource, agentId)
+            end
+            CC->>TEL: markPostCompaction()
+            CC->>CTX: reAppendSessionMetadata()
+            opt KAIROS feature
+                CC->>CTX: void writeSessionTranscriptSegment(messages)<br/>fire and forget
+            end
+
+            CC->>UI: onCompactProgress(hooks_start, post_compact)
+            CC->>Hooks: await executePostCompactHooks(trigger,<br/>raw compact summary, abortSignal)
+            Hooks-->>CC: optional userDisplayMessage
+            CC->>CC: Combine PreCompact and PostCompact display messages
+            CC-->>Caller: CompactionResult(boundary, summary,<br/>attachments, hookMessages, usage)
+        end
+    end
+
+    opt any operation above throws<br/>compact.ts:749-756
+        alt manual compaction
+            CC->>UI: addErrorNotificationIfNeeded(error)
+        else auto-compaction
+            Note over CC: Suppress user notification.<br/>Caller tracks failure and may retry later.
+        end
+        CC--xCaller: rethrow error
+    end
+
+    Note over CC,UI: finally, compact.ts:757-762
+    CC->>UI: setStreamMode(requesting)
+    CC->>UI: reset response length
+    CC->>UI: onCompactProgress(compact_end)
+    CC->>UI: setSDKStatus(null)
+```
+
+Three boundaries are worth keeping explicit:
+
+- `compactConversation()` returns a `CompactionResult`; it does not replace the caller's active message array. `queryLoop()` or the command caller later orders the boundary, summary, attachments, and hook results through `buildPostCompactMessages()`.
+- The prompt-too-long retry changes both `messagesToSummarize` and `cacheSafeParams.forkContextMessages`. The forked summary path reads the latter, while the isolated fallback reads the former.
+- The summary stored in `summaryMessages` is text. Files, active-agent state, plan state, invoked skills, deferred-tool state, and hook output survive through separately constructed post-compact attachments and messages.
 
 ### The two summarization paths
 
@@ -559,6 +797,19 @@ flowchart TD
 
 ### Post-compact attachments — budgets and dedup
 
+The generated summary preserves **semantic conversation state**: requests, decisions, findings, errors, and unfinished work. Its compression necessarily removes exact working material such as source text, skill instructions, plan content, task identifiers, and capability announcements. `compactConversation()` reconstructs a bounded set of that high-value context as typed attachment messages (`compact.ts:517-585`) so the first post-compact model call can continue without spending additional tool turns, latency, and tokens to rediscover or reload it.
+
+```text
+Pre-compact context
+    ├─ conversation meaning ──LLM summary──────────────┐
+    └─ exact working context ─typed reconstruction─────┤
+                                                       ▼
+Post-compact context
+    boundary → summary → attachments → SessionStart hook results
+```
+
+`buildPostCompactMessages()` is the ordering authority. Full compaction has no `messagesToKeep`, so the restored attachments immediately follow the summary; partial and session-memory variants may place a preserved segment between them.
+
 | Attachment | Source | Per-item cap | Total budget | Dedup rule |
 |---|---|---|---|---|
 | Restored files | `preCompactReadFileState` (recency) | `POST_COMPACT_MAX_TOKENS_PER_FILE = 5_000` | `POST_COMPACT_TOKEN_BUDGET = 50_000`, max 5 files | Skip if path is the target of a `Read` tool in `messagesToKeep` whose result isn't a stub |
@@ -569,6 +820,57 @@ flowchart TD
 | Deferred tools delta | `getDeferredToolsDeltaAttachment(tools, model, [], 'compact_full')` | n/a | Compact-full passes `[]` as previously-announced → full set | n/a |
 | Agent listing delta | `getAgentListingDeltaAttachment(context, [])` | n/a | Same | n/a |
 | MCP instructions delta | `getMcpInstructionsDeltaAttachment(mcpClients, tools, model, [])` | Same | n/a | n/a |
+
+Each attachment restores a different continuation invariant:
+
+- **Restored files** (`createPostCompactFileAttachments`, `compact.ts:1415-1464`) preserve exact source content that the summary may only describe. The function snapshots `readFileState` before clearing it, selects the most recently read eligible files, and re-reads them through `FileReadTool` so validation and on-disk freshness are preserved. This avoids an immediate repeat `Read` merely to recover working context.
+- **Async agent status** (`createAsyncAgentAttachmentsIfNeeded`, `compact.ts:1568-1599`) reports running agents and completed-but-unretrieved agents with ID, description, status, progress/error summary, and output path. It prevents duplicate launches and keeps outstanding result retrieval visible. Retrieved, pending, and self-agent entries are excluded.
+- **Plan file reference** (`createPlanAttachmentIfNeeded`, `compact.ts:1470-1486`) carries the exact plan path and content. The prose summary may explain the plan, but it is not a substitute for the authoritative steps.
+- **Plan-mode reminder** (`createPlanModeAttachmentIfNeeded`, `compact.ts:1542-1560`) restores the permission-mode constraint, plan path, and plan-existence state. Without it, a model continuing from the summary could incorrectly begin implementation while the session is still in plan mode.
+- **Invoked skills** (`createSkillAttachmentIfNeeded`, `compact.ts:1494-1534`) restore the exact instructions for skills already used by the current agent. Skills are agent-scoped and ordered most-recent-first; per-skill head truncation and the aggregate budget favor current, high-value instructions.
+- **Deferred-tools delta** re-announces currently searchable capabilities because previous `deferred_tools_delta` messages were compacted away. Full compaction passes `[]` as the already-announced history, intentionally producing an initial/full delta rather than assuming the summary preserved tool-discovery protocol state.
+- **Agent-listing delta** restores the currently usable agent types after MCP-requirement, permission-deny, and `allowedAgentTypes` filtering. This is live capability state, not merely a historical statement that an agent type once existed.
+- **MCP-instructions delta** restores current server-provided instructions and applicable client-side ToolSearch guidance. Recomputing it from connected clients avoids treating stale instructions in the old conversation or summary as authoritative.
+
+Two related values use different channels. `boundaryMarker.compactMetadata.preCompactDiscoveredTools` is boundary metadata, not an attachment; it preserves which deferred schemas had already been loaded before their `tool_reference` messages disappeared. `processSessionStartHooks('compact', ...)` returns `hookResults`, not attachments; `buildPostCompactMessages()` places those after the attachment list.
+
+#### Why reconstruct state instead of protecting old messages
+
+An alternative design would mark selected messages as non-compactable, apply size limits to them, and instruct the compact agent to copy them into the result. For ordinary foreground tools, the query loop already waits for completion and appends each `tool_result` before the next model iteration, so auto-compaction normally receives the latest completed foreground results. **The primary reason for reconstruction is therefore not that every old result is stale. It is to retain the most useful exact working context after the LLM compresses those results, avoiding immediate repeat `Read`, skill-loading, plan-recovery, or capability-discovery work.**
+
+Freshness is a secondary benefit for state that can change independently. Compaction suspends its caller but does not freeze the JavaScript event loop: while it awaits hooks, summary generation, and attachment I/O, background agents can progress, files can be changed by external processes or agents, and MCP connectivity or other capability state can change. This is why file restoration re-reads selected paths and why async-agent and capability attachments consult current runtime stores. The stale-state concern is important for these asynchronous or externally mutable sources, not a universal justification for every attachment.
+
+Delegating exact preservation to the summarizing model is also weaker than deterministic reconstruction. A summary such as “the background task completed” is semantically valid but may omit the task ID, output path, status enum, or other fields required to continue the workflow. Asking the model to copy those fields exactly still leaves omission, rewriting, hallucination, and parsing risks; generated prose is not a trustworthy replacement for typed runtime state.
+
+Protecting the original messages has structural and budget costs as well:
+
+- A retained `tool_result` may require its paired `tool_use`, thinking siblings, and surrounding API round to preserve request validity.
+- Files, plans, skills, tasks, and capability announcements are scattered through history. Keeping each relevant message can create an unbounded protected set that eventually defeats compaction.
+- Truncating or rewriting old messages would alter the historical transcript used by the UI, resume, and diagnostics.
+- Scattered protected messages provide poorer locality than one predictable state capsule immediately after the summary.
+
+The implemented split is therefore deliberate:
+
+```text
+Historical meaning
+    └─ LLM-generated summary
+
+High-value continuation context
+    └─ bounded typed reconstruction
+       ├─ re-read files
+       ├─ current task and plan state
+       ├─ agent-scoped invoked skills
+       └─ current tool, agent, and MCP capability deltas
+```
+
+The design motivations, in priority order, are:
+
+1. Preserve exact, useful working context that the generated summary will compress.
+2. Avoid extra tool calls, latency, and repeated input tokens immediately after compaction.
+3. Preserve structured identifiers and instructions that generated prose may omit or alter.
+4. Refresh asynchronous or externally mutable state where necessary.
+
+The size limits are applied to this reconstructed snapshot rather than by mutating historical messages. Files are selected by recency and constrained by count, per-file, and aggregate budgets; skills are agent-scoped, ordered by invocation recency, head-truncated per item, and constrained by an aggregate budget. A separately maintained “protected state block” would be a viable alternative, but once it is typed, bounded, selectively refreshed, and placed after the summary, it is effectively the attachment design used here.
 
 The skill budgets exist because skills can be large (verify=18.7KB, claude-api=20.1KB) and prior versions re-injected them unbounded on every compact — measured at 5-10K tok/compact. Per-skill head-truncation beats dropping because instructions at the top of a skill file are usually the critical part.
 
