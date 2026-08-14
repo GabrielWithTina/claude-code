@@ -104,7 +104,7 @@ export interface CompactionResult {
   boundaryMarker: SystemMessage              // compact-boundary marker, with optional preservedSegment metadata
   summaryMessages: UserMessage[]             // the summary (or session-memory) text
   attachments: AttachmentMessage[]           // restored files, skills, plan, async agents, delta announcements
-  hookResults: HookResultMessage[]           // SessionStart hook output (CLAUDE.md, etc.)
+  hookResults: HookResultMessage[]           // SessionStart hook-provided continuation context
   messagesToKeep?: Message[]                 // suffix preserved verbatim (partial/SM-compact)
   userDisplayMessage?: string
   preCompactTokenCount?: number
@@ -562,7 +562,7 @@ When the threshold is breached, `autoCompactIfNeeded` calls `trySessionMemoryCom
 2. Runs a **summarization API call** through one of two paths.
 3. **Clears caches** (`readFileState`, `loadedNestedMemoryPaths`).
 4. **Generates post-compact attachments** in parallel (files, async-agent status, plan, plan mode, invoked skills, deltas).
-5. Runs **SessionStart** hooks (re-injects CLAUDE.md / project memory).
+5. Runs **SessionStart** hooks with `source: 'compact'` to restore hook-provided continuation context. Built-in CLAUDE.md/UserContext and system-prompt memory are refreshed separately through post-compact cache invalidation.
 6. **Builds the boundary marker** with `preCompactDiscoveredTools` for deferred-tool state preservation.
 7. Runs **PostCompact** hooks.
 8. Returns a `CompactionResult`.
