@@ -8,20 +8,34 @@ the JSONL transcript is the durable source for resume, branch/fork, session
 listing, file rewind, attribution restore, subagent restore, and remote
 session replay.
 
-This document describes the storage model using both source code and a concrete
-sample session:
+This document describes the storage model using the recovered source and two
+concrete session samples. The newer primary sample drives the detailed counts;
+the secondary sample is used to distinguish stable relationships from
+session-specific accidents:
 
 ```text
 /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/
-  cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
-  cd51bba4-3e67-4577-9a9c-1293e0100eff/
+  a567f577-8ea3-49dc-90e3-bb47d535cfdd.jsonl       # primary, Claude Code 2.1.235
+  a567f577-8ea3-49dc-90e3-bb47d535cfdd/
+    subagents/
+    tool-results/
+  7e1e5be2-fd9c-45ea-8ef0-d84eea95e0ae.jsonl       # cross-check, Claude Code 2.1.233
+  7e1e5be2-fd9c-45ea-8ef0-d84eea95e0ae/
     subagents/
     tool-results/
 ```
 
-The sample main transcript is 515 JSONL lines and about 1.1 MB. Its session
-directory contains 28 subagent transcript files, 28 subagent metadata sidecars,
-and 3 persisted tool-result blobs.
+The primary main transcript is 889 JSONL lines and 1,888,703 bytes. Its session
+directory contains 22 subagent transcript files, 22 subagent metadata sidecars,
+and 7 persisted tool-result blobs. The secondary sample has 1,336 main rows, 41
+subagent transcripts, and 9 tool-result blobs.
+
+Version boundary matters: the on-disk samples contain several entries that the
+current recovered `types/logs.ts` union does not model (`atis-latch`,
+`file-history-delta`, `permission-mode`, and `relocated`). Conversely, the
+recovered union contains entry families not exercised by either sample. This
+document labels observed sample facts separately from source-backed behavior
+instead of treating either artifact as a complete schema.
 
 ---
 
@@ -41,7 +55,7 @@ and 3 persisted tool-result blobs.
 Recovered-source caveat: this checkout imports `src/types/message.js` and
 `types/messageQueueTypes.js`, but their TypeScript source files are not present.
 The persisted shapes below are therefore derived from `types/logs.ts`,
-`utils/sessionStorage.ts`, and the sample JSONL.
+`utils/sessionStorage.ts`, and the two sample JSONLs.
 
 ---
 
@@ -122,7 +136,7 @@ Example:
 ```text
 project path: /home/xiaos/git/gabriel/python
 project dir:  ~/.claude/projects/-home-xiaos-git-gabriel-python
-session file: ~/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
+session file: ~/.claude/projects/-home-xiaos-git-gabriel-python/a567f577-8ea3-49dc-90e3-bb47d535cfdd.jsonl
 ```
 
 ---
@@ -155,73 +169,100 @@ type Entry =
   | ContextCollapseSnapshotEntry
 ```
 
-The sample also contains `permission-mode` metadata entries. That entry type is
-observed on disk but is not present in the current recovered `Entry` union,
-which indicates source/archive version drift.
+The primary sample also contains these no-UUID entry types outside that union:
+
+| Observed type | Primary count | Secondary count | Evidence boundary |
+| --- | ---: | ---: | --- |
+| `atis-latch` | 41 | 0 | Opaque sample-only latch; every primary `atis` value is the empty string. |
+| `file-history-delta` | 3 | 4 | Per-file snapshot update used by the sampled 2.1.23x builds. |
+| `permission-mode` | 40 | 60 | Persisted permission state, `bypassPermissions` in both samples. |
+| `relocated` | 35 | 54 | Records `relocatedCwd`; absent from the recovered union and loader. |
+
+`worktree-state` and `queue-operation`, also prominent in the new samples, are
+present in the recovered union. The sampled `worktreeSession` object has two
+additional fields (`preEnterOriginalCwd` and `enteredExisting`) that are absent
+from the recovered `PersistedWorktreeSession` type, another narrow instance of
+version drift.
 
 ---
 
 ## Sample Session Inventory
 
-The sample main transcript contains:
+The primary main transcript contains:
 
 | Entry type              | Count |
 | ----------------------- | -----:|
-| `assistant`             | 223   |
-| `user`                  | 125   |
-| `system`                | 18    |
-| `attachment`            | 12    |
-| `file-history-snapshot` | 11    |
-| `ai-title`              | 36    |
-| `last-prompt`           | 28    |
-| `mode`                  | 36    |
-| `permission-mode`       | 26    |
+| `assistant`             | 239   |
+| `user`                  | 153   |
+| `system`                | 35    |
+| `attachment`            | 127   |
+| `file-history-snapshot` | 12    |
+| `file-history-delta`    | 3     |
+| `ai-title`              | 39    |
+| `last-prompt`           | 43    |
+| `mode`                  | 40    |
+| `permission-mode`       | 40    |
+| `queue-operation`       | 48    |
+| `relocated`             | 35    |
+| `worktree-state`        | 34    |
+| `atis-latch`            | 41    |
 
 Observed system subtypes:
 
 | System subtype  | Count |
 | --------------- | -----:|
-| `away_summary`  | 6     |
-| `local_command` | 5     |
-| `turn_duration` | 7     |
+| `away_summary`  | 1     |
+| `turn_duration` | 34    |
 
 Observed content block counts:
 
 | Block                | Count |
 | -------------------- | -----:|
-| assistant `text`     | 61    |
+| assistant `text`     | 78    |
 | assistant `thinking` | 51    |
-| assistant `tool_use` | 111   |
-| user string content  | 10    |
-| user `text`          | 4     |
-| user `tool_result`   | 111   |
+| assistant `tool_use` | 110   |
+| user string content  | 38    |
+| user `text`          | 5     |
+| user `tool_result`   | 110   |
 
 Observed assistant tool names:
 
 | Tool              | Count |
 | ----------------- | -----:|
-| `Agent`           | 28    |
-| `TaskUpdate`      | 28    |
-| `Bash`            | 24    |
-| `TaskCreate`      | 15    |
-| `AskUserQuestion` | 4     |
+| `Agent`           | 22    |
+| `Read`            | 24    |
+| `Bash`            | 19    |
+| `TaskUpdate`      | 14    |
+| `AskUserQuestion` | 8     |
+| `TaskCreate`      | 7     |
+| `Edit`            | 6     |
 | `Skill`           | 4     |
-| `Read`            | 3     |
+| `EnterWorktree`   | 2     |
+| `SendMessage`     | 2     |
 | `Write`           | 2     |
-| `Edit`            | 1     |
-| `TaskList`        | 1     |
-| `ToolSearch`      | 1     |
 
 Subagent inventory:
 
 | Item                          | Count |
 | ----------------------------- | -----:|
-| Subagent JSONL files          | 28    |
-| Subagent metadata files       | 28    |
-| Subagent JSONL lines total    | 681   |
-| Subagent `assistant` entries  | 381   |
-| Subagent `user` entries       | 272   |
-| Subagent `attachment` entries | 28    |
+| Subagent JSONL files          | 22    |
+| Subagent metadata files       | 22    |
+| Subagent JSONL lines total    | 1,158 |
+| Subagent `assistant` entries  | 696   |
+| Subagent `user` entries       | 440   |
+| Subagent `attachment` entries | 22    |
+
+Cross-check summary:
+
+| Metric | Primary `a567…` | Secondary `7e1e…` |
+| --- | ---: | ---: |
+| Main JSONL rows | 889 | 1,336 |
+| UUID-bearing transcript rows | 554 | 859 |
+| No-UUID metadata rows | 335 | 477 |
+| Subagent JSONLs / metadata files | 22 / 22 | 41 / 41 |
+| Subagent JSONL rows | 1,158 | 2,056 |
+| Tool-result blobs | 7 | 9 |
+| File-history snapshots / deltas | 12 / 3 | 18 / 4 |
 
 ---
 
@@ -262,10 +303,11 @@ type TranscriptMessage = Message & {
 | `timestamp`         | transcript messages           | ISO timestamp when the message was created or persisted.                                                   |
 | `isSidechain`       | transcript messages           | `false` for main session; `true` for subagent transcript entries.                                          |
 | `sessionId`         | most entries                  | Session UUID. Main and subagent files in the sample share the parent session id.                           |
+| `session_id`        | some transcript messages      | Additional sampled on-disk field not declared by recovered `TranscriptMessage`. Usually equals `sessionId`; one primary interrupted-request row carries a different value, so its semantics remain unverified. |
 | `cwd`               | transcript messages           | Working directory at persistence time.                                                                     |
 | `userType`          | transcript messages           | Build/user category, such as `external`.                                                                   |
 | `entrypoint`        | transcript messages           | Entry surface, such as `cli`, SDK, or another launcher.                                                    |
-| `version`           | transcript messages           | Claude Code version that wrote the entry. Sample uses `2.1.161`.                                           |
+| `version`           | transcript messages           | Claude Code version that wrote the entry. Primary uses `2.1.235`; secondary uses `2.1.233`.                 |
 | `gitBranch`         | transcript messages           | Best-effort current Git branch at write time.                                                              |
 | `slug`              | transcript messages           | Optional session slug used by plan files/resume-related artifacts. Not present in the sample.              |
 | `agentId`           | sidechain entries             | Subagent id when entry belongs to a sidechain transcript.                                                  |
@@ -326,6 +368,7 @@ or:
 | `isMeta`                  | Marks synthetic/system-generated user content, such as local command caveats or context reminders.                     |
 | `permissionMode`          | Permission mode active when the user message was sent. Used for rewind/restoration.                                    |
 | `promptSource`            | Source of the user prompt, observed as `typed` in the sample.                                                          |
+| `origin`                  | Optional sampled origin object. Primary values are `{kind: "human"}` and `{kind: "task-notification"}`.             |
 | `sourceToolAssistantUUID` | UUID of the assistant message containing the matching `tool_use`; used for tool-result parent linkage.                 |
 | `sourceToolUseID`         | Tool-use id that produced the user/tool-result message. Observed in sample for some tool results.                      |
 | `toolUseResult`           | Full structured tool output object retained for SDK/UI/replay. The LLM usually sees only `message.content` projection. |
@@ -381,12 +424,14 @@ Assistant entries wrap the Anthropic assistant response object:
 | `message.role`          | Always `assistant`.                                                                      |
 | `message.model`         | Model that produced this assistant response.                                             |
 | `message.content`       | Array of assistant blocks such as `text`, `thinking`, and `tool_use`.                    |
-| `message.stop_reason`   | Why the model stopped. Sample values: `tool_use`, `end_turn`.                            |
-| `message.stop_sequence` | Stop sequence if one was hit; null in the sample.                                        |
-| `message.stop_details`  | Provider stop details; null in the sample.                                               |
+| `message.stop_reason`   | Why the model stopped. New-sample values: `tool_use`, `end_turn`, `stop_sequence`.       |
+| `message.stop_sequence` | Stop sequence if one was hit.                                                            |
+| `message.stop_details`  | Optional provider stop details.                                                          |
 | `message.diagnostics`   | Optional provider diagnostics. Sample includes `cache_miss_reason`.                      |
 | `message.usage`         | Token/cache/server-tool usage for the response.                                          |
 | `requestId`             | API request id associated with the response.                                             |
+| `effort`                | Sampled reasoning-effort stamp. Present as `high` on 237 of 239 primary assistant rows. |
+| `error` / `isApiErrorMessage` | Sampled API-error annotation. One primary row records `server_error` with `isApiErrorMessage: true`. |
 | `attributionPlugin`     | Plugin attribution stamped onto the assistant entry. Sample commonly uses `superpowers`. |
 | `attributionSkill`      | Skill attribution stamped onto the assistant entry.                                      |
 | `attributionAgent`      | Agent attribution in subagent transcripts.                                               |
@@ -408,12 +453,13 @@ Assistant entries wrap the Anthropic assistant response object:
 System transcript entries are local Claude Code events, not Anthropic system
 prompt messages.
 
-Observed sample subtypes:
+Observed across the two new samples (`local_command` occurs only in the
+secondary):
 
 | Subtype         | Fields                                 | Meaning                                                              |
 | --------------- | -------------------------------------- | -------------------------------------------------------------------- |
 | `local_command` | `content`, `level`, `isMeta`           | Local slash/command output or metadata persisted for context/replay. |
-| `turn_duration` | `durationMs`, `messageCount`, `isMeta` | Per-turn timing and message-count metric.                            |
+| `turn_duration` | `durationMs`, `messageCount`, `pendingBackgroundAgentCount`, `isMeta` | Per-turn timing, message count, and pending-agent count.             |
 | `away_summary`  | `content`, `isMeta`                    | Away/idle summary shown to the user.                                 |
 
 Common fields:
@@ -464,7 +510,8 @@ typed by the user: hook output, selected IDE text, opened files, skill listings,
 task reminders, deferred tool availability, memory snippets, file references,
 and similar environment/context events.**
 
-The sample has 12 attachment entries with these observed attachment types:
+The primary sample has 127 attachment entries with these observed attachment
+types. The high count is dominated by 91 `total_tokens_reminder` rows:
 
 | Attachment type           | Meaning                                                                                         |
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -474,6 +521,21 @@ The sample has 12 attachment entries with these observed attachment types:
 | `command_permissions`     | Local command permission metadata.                                                              |
 | `task_reminder`           | Reminder/context for task-tracking tools.                                                       |
 | `deferred_tools_delta`    | Delta of deferred tools made available or removed for `ToolSearch`.                             |
+| `agent_listing_delta`     | Initial or incremental list of agent types available to the `Agent` tool.                       |
+| `total_tokens_reminder`   | Sample-observed token-state reminder; absent from the recovered attachment normalizer.          |
+
+| Attachment type | Primary count | Secondary count |
+| --- | ---: | ---: |
+| `total_tokens_reminder` | 91 | 150 |
+| `hook_success` | 17 | 17 |
+| `task_reminder` | 10 | 0 |
+| `command_permissions` | 4 | 4 |
+| `skill_listing` | 2 | 1 |
+| `agent_listing_delta` | 1 | 1 |
+| `hook_additional_context` | 1 | 1 |
+| `deferred_tools_delta` | 1 | 0 |
+| `edited_text_file` | 0 | 1 |
+| `queued_command` | 0 | 1 |
 
 Observed attachment fields:
 
@@ -488,6 +550,8 @@ Observed attachment fields:
 | `attachment.allowedTools`, `pendingMcpServers`                     | Context about tools/MCP availability.             |
 | `attachment.names`, `addedNames`, `removedNames`, `readdedNames`   | Skill/tool/context name lists.                    |
 | `attachment.itemCount`, `skillCount`, `isInitial`                  | Count and initialization metadata.                |
+| `attachment.text`                                                   | Text carried by the observed `total_tokens_reminder`. |
+| `attachment.addedLines`, `addedTypes`, `removedTypes`               | Agent-listing delta content.                       |
 
 ### Attachment API Normalization
 
@@ -505,6 +569,8 @@ For the sample attachment types:
 | `command_permissions`     | Returns `[]`; persisted as local/UI permission context but not sent to the LLM.                                                                        |
 | `task_reminder`           | Converts to a meta user reminder only when TodoV2 is enabled; otherwise returns `[]`.                                                                  |
 | `deferred_tools_delta`    | Converts added/removed deferred tool lines to a meta user reminder about `ToolSearch` availability.                                                    |
+| `agent_listing_delta`     | Converts added/removed agent definitions to a meta user reminder; the initial row can also include the concurrency note.                             |
+| `total_tokens_reminder`   | Observed on disk, but no corresponding case exists in the recovered `normalizeAttachmentForAPI`; exact sampled-build projection is therefore unverified. |
 
 Other attachment families follow the same pattern:
 
@@ -541,11 +607,12 @@ type is `text`, `image`, `notebook`, or `pdf`. Large `@`-mentioned PDFs can use 
 lightweight `pdf_reference` attachment instead of inlining the document; the
 normalized reminder tells the model to read specific page ranges with `Read`.
 
-In the sample session, there are no `file`, `directory`,
+In the primary sample, there are no `file`, `directory`,
 `compact_file_reference`, `pdf_reference`, `edited_text_file`,
 `selected_lines_in_ide`, or `opened_file_in_ide` attachment entries. The project
-was still heavily inspected, but through explicit tool calls: 61 `Read` tool
-uses and 176 `Bash` tool uses across the main session and subagent transcripts.
+was still inspected through explicit tool calls. The secondary sample adds one
+`edited_text_file` attachment, which confirms that the absence is
+session-specific rather than a schema restriction.
 
 ### Skill Listing Refresh Semantics
 
@@ -602,8 +669,8 @@ This is used for session title by calling a haiku model for fast generation.
 ```json
 {
   "type": "ai-title",
-  "aiTitle": "Create FastAPI language reference guide server",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "aiTitle": "game-raiden web application",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 
@@ -617,9 +684,9 @@ This is used for session title by calling a haiku model for fast generation.
 ```json
 {
   "type": "last-prompt",
-  "lastPrompt": "Create a FastAPI based server app...",
-  "leafUuid": "2e9935ae-99d4-4168-8492-578b7d4fb323",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "lastPrompt": "still running, let me know when it's done",
+  "leafUuid": "b0c60a24-f976-4bb8-a51c-9acbf8b017d8",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 
@@ -632,7 +699,7 @@ This is used for session title by calling a haiku model for fast generation.
 ### `mode`
 
 ```json
-{ "type": "mode", "mode": "normal", "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff" }
+{ "type": "mode", "mode": "normal", "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd" }
 ```
 
 | Field       | Meaning                                          |
@@ -646,7 +713,7 @@ This is used for session title by calling a haiku model for fast generation.
 {
   "type": "permission-mode",
   "permissionMode": "bypassPermissions",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 
@@ -657,6 +724,24 @@ This is used for session title by calling a haiku model for fast generation.
 
 This entry is observed in the sample but not present in the current recovered
 `types/logs.ts` `Entry` union.
+
+### Queue, relocation, and worktree metadata
+
+The primary sample makes session movement and asynchronous notification state
+visible in the append log:
+
+| Type | Primary observation | Interpretation boundary |
+| --- | --- | --- |
+| `queue-operation` | 24 `enqueue` + 24 `dequeue` | The recovered queue manager logs string content on enqueue and an operation-only row on dequeue. All primary enqueue content is background-agent task-notification XML. |
+| `worktree-state` | 33 non-null + 1 null | Last-wins worktree state. The null row records exit; the recovered loader restores the most recent value. |
+| `relocated` | 33 rows to `python-workspace`, 2 back to `python` | Sample-observed cwd relocation marker; its read/write path is absent from the recovered source. |
+| `atis-latch` | 41 rows, all `atis: ""` | Opaque sample-observed latch; no semantics are asserted because the recovered source has no matching type or handler. |
+
+The secondary sample independently exercises `queue-operation` (`51 enqueue`,
+`50 dequeue`, `1 remove`) and repeated worktree enter/exit state (`44` non-null,
+`10` null). `utils/messageQueueManager.ts` confirms that `remove` is a distinct
+queue operation, while `types/logs.ts` and `utils/sessionStorage.ts` confirm
+last-wins persistence for `worktree-state`.
 
 ---
 
@@ -701,147 +786,86 @@ File history stores pre-mutation backups and snapshot metadata for rewind.
 
 ### Snapshot Generation Timing
 
-There are two kinds of `file-history-snapshot` entries in the JSONL:
+The recovered source and the sampled 2.1.23x binaries encode the same logical
+lifecycle differently.
 
-| Entry kind                                | Trigger                                                                                                                                                                       | JSONL behavior                                                                                  | State behavior                                                                                              |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Base snapshot, `isSnapshotUpdate: false`  | **A selectable/restorable parent user message is processed**. The prompt-submit paths call `fileHistoryMakeSnapshot()` for messages that pass `selectableUserMessagesFilter`. | Appends a `file-history-snapshot` entry whose `messageId` is the user message UUID.             | Adds a new snapshot to `fileHistory.snapshots`.                                                             |
-| Update snapshot, `isSnapshotUpdate: true` | **A file-history-aware mutation tool calls `fileHistoryTrackEdit()` during the current turn**, before mutating a file not yet tracked in the latest snapshot.                 | Appends a new `file-history-snapshot` entry. It does not edit the previous JSONL line in place. | Replaces the most recent in-memory snapshot with an updated copy that includes the new tracked file backup. |
+Recovered-source representation:
 
-The base snapshot call sites are:
+| Entry | Trigger | Reconstruction |
+| --- | --- | --- |
+| `file-history-snapshot`, `isSnapshotUpdate: false` | A selectable/restorable user message reaches `fileHistoryMakeSnapshot()`. | Adds a new snapshot anchored by the user-message UUID. |
+| `file-history-snapshot`, `isSnapshotUpdate: true` | `fileHistoryTrackEdit()` adds a previously untracked path to the current snapshot. | `buildFileHistorySnapshotChain()` replaces the earlier base snapshot in reconstructed state. |
 
-| Path                                    | Timing                                                                                        |
-| --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `screens/REPL.tsx` initial message path | Creates the initial code-rewind checkpoint for the first REPL message.                        |
-| `utils/handlePromptSubmit.ts`           | Creates checkpoints for selectable user messages produced from interactive prompt submission. |
-| `QueryEngine.ts`                        | Creates checkpoints for selectable user messages in persisted non-interactive sessions.       |
+Sampled 2.1.233/2.1.235 representation:
 
-The important distinction is that snapshot anchoring is by message UUID, not by
-nearby JSONL line position. Snapshot persistence and transcript message
-persistence are separate append operations, so a base snapshot line can appear
-before the user message line it references. In the sample session, line 2 points
-to the `/clear` user message at line 6, and line 8 points to the typed prompt at
-line 9. The reliable relationship is:
+| Entry | Trigger/effect visible on disk |
+| --- | --- |
+| `file-history-snapshot`, always `isSnapshotUpdate: false` in both samples | Full point-in-time snapshot at a restorable message boundary. |
+| `file-history-delta` | One newly tracked path, linked to the base by `snapshotMessageId`, with the causing `messageId`, `trackingPath`, timestamp, and one backup record. |
 
-```text
-file-history-snapshot.messageId == target user message uuid
-```
-
-Update entries have two message ids with different meanings:
-
-```json
-{
-  "type": "file-history-snapshot",
-  "messageId": "assistant-tool-use-message-uuid",
-  "snapshot": {
-    "messageId": "original-user-message-uuid",
-    "trackedFileBackups": {}
-  },
-  "isSnapshotUpdate": true
-}
-```
-
-| Field                 | Meaning for update entries                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------- |
-| Top-level `messageId` | The message that caused the update, usually the assistant message containing the file-writing tool use. |
-| `snapshot.messageId`  | The original base snapshot being updated, usually the current turn's restorable user message.           |
-| `isSnapshotUpdate`    | Tells restore/loading code to fold this appended JSONL entry over the earlier base snapshot.            |
-
-On resume, `buildFileHistorySnapshotChain()` reconstructs the effective snapshot
-chain. For each `file-history-snapshot` entry, it looks up the entry by the
-conversation message UUID. A base entry pushes a new snapshot. An update entry
-finds the existing snapshot by `snapshot.messageId` and replaces that snapshot
-in the reconstructed array. The JSONL remains append-only; the replacement only
-happens in reconstructed state.
-
-In the sample session, the split is:
-
-| Count | Meaning                                                                                     |
-| ----- | ------------------------------------------------------------------------------------------- |
-| 9     | Base snapshots for selectable/restorable parent user messages.                              |
-| 2     | Update snapshots from parent-thread `Write` tool calls.                                     |
-| 11    | Total `file-history-snapshot` JSONL entries.                                                |
-| 2     | Physical backup blobs, because only two tracked files ever needed concrete content backups. |
-
-**The resulting lifecycle is:**
+The primary has 12 full snapshots and 3 deltas; the secondary has 18 and 4.
+Neither contains an `isSnapshotUpdate: true` row. Because `file-history-delta`
+does not exist in this checkout, its exact sampled-build loader algorithm is not
+source-verifiable here. Its relationship is nevertheless explicit in the data:
 
 ```text
-Restorable parent user message
-  -> append base file-history-snapshot metadata anchored by user UUID
-
-File-history-aware mutation during that turn
-  -> replace latest snapshot in memory
-  -> append isSnapshotUpdate:true JSONL entry anchored by the tool-use message
-
-Later restorable parent user message
-  -> append new base snapshot, carrying forward tracked file backup state
+file-history-delta.snapshotMessageId
+  == file-history-snapshot.snapshot.messageId of the base being extended
 ```
 
-```json
-{
-  "type": "file-history-snapshot",
-  "messageId": "aa6082e8-5581-4370-8e81-d22d43d57eae",
-  "snapshot": {
-    "messageId": "aa6082e8-5581-4370-8e81-d22d43d57eae",
-    "trackedFileBackups": {
-      "docs/superpowers/specs/2026-06-03-lang-reference-guide-design.md": {
-        "backupFileName": "0123456789abcdef@v1",
-        "version": 1,
-        "backupTime": "2026-06-03T09:15:03.641Z"
-      }
-    },
-    "timestamp": "2026-06-03T09:15:03.641Z"
-  },
-  "isSnapshotUpdate": false
-}
-```
+Every sampled backup record also carries `realParentDir`, an absolute directory
+that disambiguates the same relative tracking path across relocation/worktree
+contexts. That field is absent from the recovered `FileHistoryBackup` type, so
+its exact restore algorithm is another sampled-build detail rather than a
+source-confirmed contract in this checkout.
 
-| Field                         | Meaning                                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `messageId`                   | Message UUID associated with the file-history state.                                      |
-| `snapshot.messageId`          | Same logical snapshot anchor.                                                             |
-| `snapshot.trackedFileBackups` | Map of tracked path -> backup metadata.                                                   |
-| `backupFileName`              | Blob filename under `~/.claude/file-history/<sessionId>/`; null means file did not exist. |
-| `version`                     | Per-file backup version.                                                                  |
-| `backupTime`                  | Backup creation time.                                                                     |
-| `snapshot.timestamp`          | Snapshot timestamp.                                                                       |
-| `isSnapshotUpdate`            | Whether this line updates an earlier snapshot.                                            |
+Primary delta timeline:
 
-### Observed Session Behavior
+| JSONL line | Causing message | Base snapshot | Tracking path | Pre-edit backup |
+| ---: | --- | --- | --- | --- |
+| 143 | `32b52d6b…` | `9cc905cd…` | `docs/superpowers/specs/2026-08-19-game-raiden-design.md` | `null` (new file) |
+| 245 | `082c4d55…` | `50bf054a…` | `docs/superpowers/plans/2026-08-19-game-raiden.md` | `null` (new file) |
+| 770 | `13136c75…` | `91d4e31a…` | `.gitignore` | `1eeff9330bc08d58@v1` |
 
-For sample session
-`/home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl`,
-the main transcript contains 11 `file-history-snapshot` entries, but the
-corresponding file-history directory contains only two physical backup blobs:
+The tracked-file count carried by later primary snapshots grows `0 -> 1 -> 2
+-> 3`, confirming that each delta becomes part of subsequent full snapshots.
+The file-history directory contains five physical blobs:
 
 ```text
-~/.claude/file-history/cd51bba4-3e67-4577-9a9c-1293e0100eff/
-  407d6e14c9eed3f5@v2
-  da8c25ed54b72cc4@v2
+~/.claude/file-history/a567f577-8ea3-49dc-90e3-bb47d535cfdd/
+  1eeff9330bc08d58@v1
+  1eeff9330bc08d58@v2
+  e8a8fa646bc5d644@v2
+  fb940146e804c3d2@v2
+  fb940146e804c3d2@v3
 ```
 
-That is expected for this session:
+| Tracked path | Final primary backup | Why earlier blobs differ |
+| --- | --- | --- |
+| `docs/superpowers/specs/2026-08-19-game-raiden-design.md` | `e8a8fa646bc5d644@v2` | The pre-create v1 state was null, so no v1 file exists. |
+| `docs/superpowers/plans/2026-08-19-game-raiden.md` | `fb940146e804c3d2@v3` | Null v1, then two concrete versions were captured. |
+| `.gitignore` | `1eeff9330bc08d58@v2` | The file already existed, so both pre-edit v1 and later v2 are physical. |
 
-| Observation                                                                     | Explanation                                                                                                                                                                   |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Early snapshots have no files.                                                  | `fileHistoryMakeSnapshot()` can record a message-boundary snapshot before any file is tracked.                                                                                |
-| The first tracked version for each new file has `backupFileName: null`.         | The relevant `Write` created a new file, so the pre-edit state was "file did not exist"; `createBackup()` records a null marker instead of creating an `@v1` blob.            |
-| The only physical blobs are `@v2`.                                              | The next snapshot after each new file existed copied the concrete file contents into the file-history directory.                                                              |
-| Later snapshots keep referencing the same two `@v2` blobs.                      | Once a tracked file is unchanged, `fileHistoryMakeSnapshot()` reuses the latest backup metadata instead of creating another blob.                                             |
-| Many subagent-written files do not appear in the parent file-history directory. | Subagent contexts use a no-op `updateFileHistoryState`, so their file mutations are stored in subagent transcripts but do not update the parent session's file-history state. |
-| Normal shell operations do not automatically create file-history blobs.         | Only file-history-aware mutation paths call `fileHistoryTrackEdit()`; Bash only participates for the internal simulated-sed edit path.                                        |
+The secondary sample independently shows the same delta/full-snapshot pattern,
+including null v1 records for two new documentation files and physical v1/v2
+blobs for two pre-existing Python files. This makes the delta model a
+cross-sample behavior, while exact paths and version counts remain
+session-specific.
 
-The two observed blobs map to the two parent-thread tracked files:
+The stable lifecycle across both representations is:
 
-| Backup blob           | Tracked path                                                       |
-| --------------------- | ------------------------------------------------------------------ |
-| `da8c25ed54b72cc4@v2` | `docs/superpowers/specs/2026-06-03-lang-reference-guide-design.md` |
-| `407d6e14c9eed3f5@v2` | `docs/superpowers/plans/2026-06-03-lang-reference-guide.md`        |
+```text
+restorable user-message boundary
+  -> persist full snapshot
 
-So the answer to "why only two files" is: this session only tracked two
-parent-thread files through file-history-aware mutations, both were new files,
-their `v1` states were null "did not exist" markers inside the JSONL, and their
-first physical contents were captured as `@v2` blobs.
+first file-history-aware mutation of a path in that snapshot
+  -> capture pre-edit state (null if the path does not exist)
+  -> persist an update: full replacement in recovered source,
+     per-file delta in sampled 2.1.23x binaries
+
+later boundary
+  -> persist a full snapshot carrying all tracked paths forward
+```
 
 ### Rewind Scope and Success Semantics
 
@@ -891,24 +915,22 @@ and are not conversation graph nodes.
 
 ### Observed Shape
 
-For the sample session, the parent graph is a tree per transcript file:
+For the primary sample, the parent graph is a tree per transcript file:
 
 | Scope                          | Observed result                                                                      |
 | ------------------------------ | ------------------------------------------------------------------------------------ |
-| Main transcript                | 378 UUID-bearing nodes, 1 root, no missing parents, no cycles, no unreachable nodes. |
-| Main fan-out                   | 39 parent nodes have more than one child; the maximum observed child count is 2.     |
-| Main row adjacency             | 87 parent links do not point to the immediately previous UUID-bearing JSONL row.     |
-| Subagent transcripts           | 28 JSONL files, each with 1 root and no missing parents or cycles.                   |
-| Subagent fan-out               | 22 of 28 subagent files have at least one parent with more than one child.           |
-| Whole inspected transcript set | Main tree plus 28 subagent trees, which forms a forest across files.                 |
+| Main transcript                | 554 UUID-bearing nodes, 1 root, 13 leaves, no missing parents, cycles, duplicate UUIDs, or unreachable nodes. |
+| Main root                      | Line 5, `attachment:hook_success`, UUID `1e8396d1…`.                                      |
+| Main fan-out                   | 12 parent nodes have more than one child; maximum child count is 2.                       |
+| Main row adjacency             | 14 parent links do not point to the immediately previous UUID-bearing JSONL row.           |
+| Subagent transcripts           | 22 JSONL files, each with 1 root and no missing parents.                                   |
+| Subagent fan-out               | 11 of 22 subagent files have at least one parent with more than one child.                  |
+| Whole inspected transcript set | Main tree plus 22 subagent trees, which forms a forest across files.                       |
 
-Example fan-out from the main sample:
-
-```text
-parent 7b522683-7c3a-4596-a052-e51f297da957
-  -> line 24 assistant 21015386-... tool_use:TaskCreate
-  -> line 31 user      7c9018a9-... tool_result:toolu_01RTY886mPhqXYC8MukXSMX3
-```
+The secondary graph reproduces the structural result at a larger scale: 859
+UUID nodes, 1 root, 13 leaves, 12 fan-out parents, 14 non-adjacent parent links,
+and 41 valid one-root subagent trees. Exact counts are sample-specific; the
+forest/parent-chain model is stable across both.
 
 This is not a linked list. A linked list would allow only one child per node and
 would usually make the previous persisted message the parent. The observed
@@ -983,7 +1005,8 @@ conversation.
 
 ## Subagent Files
 
-Each subagent file is a sidechain transcript. The sample has 28 subagent JSONLs.
+Each subagent file is a sidechain transcript. The primary sample has 22
+subagent JSONLs and 22 matching `.meta.json` files.
 Their entries have the same message shape as main transcript entries with these
 differences:
 
@@ -999,8 +1022,10 @@ Subagent metadata sidecar sample:
 ```json
 {
   "agentType": "general-purpose",
-  "description": "Apply Task 5 review fixes",
-  "toolUseId": "toolu_01SSj8Tg72KVrQccrMFgcAv7"
+  "description": "...",
+  "toolUseId": "toolu_...",
+  "model": "...",
+  "spawnDepth": 0
 }
 ```
 
@@ -1009,7 +1034,14 @@ Subagent metadata sidecar sample:
 | `agentType`    | Agent definition/type used to launch the subagent.                        |
 | `description`  | Original task description, used for resume/UI display.                    |
 | `toolUseId`    | Parent assistant tool-use id that spawned the subagent.                   |
+| `model`        | Model selected for the subagent. Observed in every new metadata sidecar.  |
+| `spawnDepth`   | Nested spawn depth. Observed in every new metadata sidecar.               |
 | `worktreePath` | Optional isolated worktree path. Not present in observed sample metadata. |
+
+Primary agent types are 14 `general-purpose` and 8
+`superpowers:code-reviewer`; the secondary has 24 and 17 respectively. Every
+main-session `Agent` tool use has one matching transcript and metadata sidecar
+in both samples (22 and 41).
 
 ---
 
@@ -1019,25 +1051,35 @@ Tool-result sidecars store oversized tool output outside the JSONL transcript.
 The transcript remains the source of conversation structure; the sidecar is only
 the full payload backing file.
 
-The sample session has three sidecar blobs:
+The primary sample has seven sidecar blobs totaling 1,186,517 bytes:
 
 ```text
-tool-results/bfnn83qj4.txt 680576 bytes
-tool-results/bh5ajgxix.txt 389862 bytes
-tool-results/bt6a0wf0e.txt 32946 bytes
+tool-results/baenpcq0i.txt   99110 bytes
+tool-results/bsiogi9sa.txt   99192 bytes
+tool-results/bpkzzucgk.txt  156341 bytes
+tool-results/bz8bxlgeq.txt  177603 bytes
+tool-results/bus0jom9y.txt  177997 bytes
+tool-results/bmqyiaksa.txt  203247 bytes
+tool-results/b60ebbrr7.txt  273027 bytes
 ```
 
-Observed references in the sample:
+Observed references in the primary sample:
 
-| Sidecar file    | Referencing subagent JSONL                | JSONL line | Producing tool |
-| --------------- | ----------------------------------------- | ---------- | -------------- |
-| `bt6a0wf0e.txt` | `subagents/agent-afcbd3f4a3214735f.jsonl` | `L007`     | `Bash`         |
-| `bh5ajgxix.txt` | `subagents/agent-ab23a854385c678eb.jsonl` | `L006`     | `Bash`         |
-| `bfnn83qj4.txt` | `subagents/agent-ad83af2dc94669885.jsonl` | `L007`     | `Bash`         |
+| Sidecar file | Referencing subagent JSONL | JSONL line | Producing tool |
+| --- | --- | ---: | --- |
+| `baenpcq0i.txt` | `agent-a71f3a468619ce21d.jsonl` | 5 | `Bash` |
+| `bsiogi9sa.txt` | `agent-af9f3a8c5814e5d87.jsonl` | 5 | `Bash` |
+| `bpkzzucgk.txt` | `agent-a412386f0568b7ad6.jsonl` | 80 | `Bash` |
+| `bz8bxlgeq.txt` | `agent-a7ce16c473075608f.jsonl` | 5 | `Bash` |
+| `bus0jom9y.txt` | `agent-abfa7135783906222.jsonl` | 12 | `Bash` |
+| `bmqyiaksa.txt` | `agent-a3ba768becd8726a4.jsonl` | 22 | `Bash` |
+| `b60ebbrr7.txt` | `agent-ae8b477399755bd14.jsonl` | 14 | `Bash` |
 
-The main session JSONL has no observed `<persisted-output>` reference. The
+The primary main-session JSONL has no observed `<persisted-output>` reference. The
 sidecar files live under the parent session directory, but the transcript rows
-that point at them are inside the subagent sidechain files.
+that point at them are inside the subagent sidechain files. The secondary sample
+repeats the pattern for all nine blobs (10,367,168 bytes total): every reference
+is in a subagent `Bash` result, with none in the main transcript.
 
 ### JSONL Entry Shape
 
@@ -1048,19 +1090,19 @@ content is replaced with a small XML-ish pointer and preview:
 ```json
 {
   "type": "user",
-  "uuid": "05caa05d-bda2-453b-bbac-e293c45757e5",
-  "parentUuid": "b8ce5bc2-2fd9-4a47-8425-739d18e76dbc",
+  "uuid": "...",
+  "parentUuid": "assistant-message-uuid",
   "isSidechain": true,
-  "agentId": "afcbd3f4a3214735f",
-  "sourceToolAssistantUUID": "b8ce5bc2-2fd9-4a47-8425-739d18e76dbc",
+  "agentId": "a71f3a468619ce21d",
+  "sourceToolAssistantUUID": "assistant-message-uuid",
   "message": {
     "role": "user",
     "content": [
       {
         "type": "tool_result",
-        "tool_use_id": "toolu_01LKcgiJZyXNnFssMCHvxAta",
+        "tool_use_id": "toolu_...",
         "is_error": false,
-        "content": "<persisted-output>\nOutput too large (32.2KB). Full output saved to: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff/tool-results/bt6a0wf0e.txt\n\nPreview (first 2KB):\n...\n</persisted-output>"
+        "content": "<persisted-output>\nOutput too large. Full output saved to: .../a567f577-8ea3-49dc-90e3-bb47d535cfdd/tool-results/baenpcq0i.txt\n\nPreview ...\n</persisted-output>"
       }
     ]
   }
@@ -1072,12 +1114,12 @@ The previous assistant message is the producing tool call:
 ```json
 {
   "type": "assistant",
-  "uuid": "b8ce5bc2-2fd9-4a47-8425-739d18e76dbc",
+  "uuid": "assistant-message-uuid",
   "message": {
     "content": [
       {
         "type": "tool_use",
-        "id": "toolu_01LKcgiJZyXNnFssMCHvxAta",
+        "id": "toolu_...",
         "name": "Bash"
       }
     ]
@@ -1089,37 +1131,26 @@ The linkage is therefore:
 
 ```text
 assistant tool_use
-  uuid = b8ce5bc2...
-  content[].id = toolu_01LK...
+  uuid = assistant-message-uuid
+  content[].id = toolu_...
 
     -> user tool_result
-       parentUuid = b8ce5bc2...
-       sourceToolAssistantUUID = b8ce5bc2...
-       content[].tool_use_id = toolu_01LK...
+       parentUuid = assistant-message-uuid
+       sourceToolAssistantUUID = assistant-message-uuid
+       content[].tool_use_id = toolu_...
        content[].content = <persisted-output> sidecar path + preview
 ```
 
-The sidecar file itself is raw text, not JSON. For `bt6a0wf0e.txt`, the file
-begins with the full numbered plan document that the `Bash` command produced.
+The sidecar file itself is raw text, not JSON. All seven primary pointers and
+all nine secondary pointers resolve to an existing blob; no unmatched or
+unreferenced tool-result file was observed.
 
 ### Follow-Up Reads
 
 The `<persisted-output>` wrapper gives the model a readable absolute path. If
 the model needs more than the preview, it can call `Read` on the sidecar like a
-normal file. In the sample `agent-afcbd3f4a3214735f.jsonl`, the subagent reads
-`bt6a0wf0e.txt` in chunks:
-
-| JSONL line | Entry type  | Tool action                                         |
-| ---------- | ----------- | --------------------------------------------------- |
-| `L008`     | `assistant` | `Read` `bt6a0wf0e.txt`, `limit: 120`                |
-| `L009`     | `user`      | `tool_result` with lines 1-120                      |
-| `L010`     | `assistant` | `Read` `bt6a0wf0e.txt`, `offset: 120`, `limit: 100` |
-| `L011`     | `user`      | `tool_result` with that chunk                       |
-| `L012`     | `assistant` | `Read` `bt6a0wf0e.txt`, `offset: 220`, `limit: 120` |
-| `L013`     | `user`      | `tool_result` with that chunk                       |
-
-Those follow-up rows are ordinary `Read` tool-use/tool-result transcript rows.
-They are not special sidecar metadata entries.
+normal file. Such follow-up rows are ordinary `Read` tool-use/tool-result
+transcript rows, not special sidecar metadata entries.
 
 ### Source Paths and Filename Rules
 
@@ -1137,9 +1168,9 @@ For generic tools, the persisted filename is based on the Anthropic
 `tool_use_id` passed to `persistToolResult()`. For Bash and PowerShell, large
 process output first flows through `TaskOutput`; the shell tool copies or
 hard-links the task output file into `tool-results/` using
-`getToolResultPath(result.outputTaskId, false)`. That is why the sample's Bash
-sidecar is named `bt6a0wf0e.txt` while the transcript's model-facing
-`tool_use_id` remains `toolu_01LKcgiJZyXNnFssMCHvxAta`.
+`getToolResultPath(result.outputTaskId, false)`. That is why a sampled Bash
+sidecar has a short name such as `baenpcq0i.txt` while the transcript's
+model-facing id remains a separate `toolu_...` value.
 
 The shell task id is generated by `generateTaskId('local_bash')` as a short
 case-insensitive id. It is an internal output-file id, not an API message id.
@@ -1163,8 +1194,8 @@ aggregate tool-result budget and resume reconstruction machinery. Its shape is:
 }
 ```
 
-The provided sample has no observed `content-replacement` entries in either the
-main transcript or the subagent transcripts. Its sidecar references are encoded
+Neither new sample has a `content-replacement` entry in its main or subagent
+transcripts. Their sidecar references are encoded
 directly in normal `tool_result.content` strings via the `<persisted-output>`
 wrapper.
 
@@ -1178,7 +1209,7 @@ user tool_result.content = <persisted-output>...
   -> small model-visible pointer and preview
 
 content-replacement entry
-  -> separate resume/budget metadata; not used by this sample's sidecar rows
+  -> separate resume/budget metadata; not used by these samples' sidecar rows
 ```
 
 ---
@@ -1256,12 +1287,12 @@ User local-command metadata:
   },
   "isMeta": true,
   "uuid": "dddbd323-6d5d-4fb4-8f3f-9897539a16b2",
-  "timestamp": "2026-06-03T09:10:48.540Z",
+  "timestamp": "2026-08-19T00:00:00.000Z",
   "userType": "external",
   "entrypoint": "cli",
   "cwd": "/home/xiaos/git/gabriel/python",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff",
-  "version": "2.1.161",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd",
+  "version": "2.1.235",
   "gitBranch": "main"
 }
 ```
@@ -1286,8 +1317,8 @@ Assistant tool use:
   },
   "requestId": "req_...",
   "uuid": "5afb77dd-0dd0-49db-b14c-064c108a8603",
-  "timestamp": "2026-06-03T09:15:08.734Z",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "timestamp": "2026-08-19T00:00:01.000Z",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 
@@ -1314,8 +1345,8 @@ User tool result:
   },
   "sourceToolAssistantUUID": "5afb77dd-0dd0-49db-b14c-064c108a8603",
   "uuid": "2bac8d25-ecec-4703-a15a-7c8fdf101742",
-  "timestamp": "2026-06-03T09:15:08.760Z",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "timestamp": "2026-08-19T00:00:02.000Z",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 
@@ -1337,8 +1368,8 @@ Attachment hook result:
     "durationMs": 40
   },
   "uuid": "b00a16af-4bca-4f9d-9523-b535e6503764",
-  "timestamp": "2026-06-03T09:10:48.539Z",
-  "sessionId": "cd51bba4-3e67-4577-9a9c-1293e0100eff"
+  "timestamp": "2026-08-19T00:00:00.000Z",
+  "sessionId": "a567f577-8ea3-49dc-90e3-bb47d535cfdd"
 }
 ```
 

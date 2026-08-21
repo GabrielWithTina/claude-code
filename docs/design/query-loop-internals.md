@@ -20,6 +20,42 @@ retrieval handles.
 
 ---
 
+## Caller boundary
+
+`queryLoop()` is private to `query.ts`. Its only direct caller is the exported
+`query()` async-generator wrapper (`query.ts:219-238`), which delegates with
+`yield* queryLoop(params, consumedCommandUuids)`. The runtime call hierarchy is
+therefore:
+
+```text
+REPL foreground ─────────────┐
+QueryEngine.submitMessage ───┤
+AgentTool/runAgent ──────────┤
+runForkedAgent ──────────────┼─> query() ─> queryLoop()
+agent hook execution ────────┤
+background main session ─────┘
+```
+
+The six direct call sites of the exported `query()` wrapper are:
+
+| Caller | Call site | Responsibility |
+|---|---|---|
+| Interactive REPL | `screens/REPL.tsx:2793` | Runs the foreground terminal conversation and consumes query events through the REPL event handler. |
+| `QueryEngine.submitMessage()` | `QueryEngine.ts:675` | Runs a turn for the headless/SDK session lifecycle. |
+| `runAgent()` | `tools/AgentTool/runAgent.ts:748` | Runs Agent-tool and subagent conversations. |
+| `runForkedAgent()` | `utils/forkedAgent.ts:545` | Runs ephemeral internal agents used by services such as compaction, memory, prompt suggestion, and auto-dream. |
+| `execAgentHook()` | `utils/hooks/execAgentHook.ts:167` | Runs a multi-turn agent hook. |
+| `startBackgroundSession()` | `tasks/LocalMainSessionTask.ts:383` | Continues a main-session query as an independent background task. |
+
+This wrapper boundary matters for queued-command lifecycle. `queryLoop()`
+records command UUIDs when queued commands become attachments. After the loop
+returns normally, `query()` marks those commands `completed`
+(`query.ts:229-237`). External consumers therefore call `query()`, not the
+state-machine implementation, and observe its yielded protocol while the
+wrapper performs this final lifecycle step.
+
+---
+
 ## Function contract (`query.ts:241-251`)
 
 `queryLoop()` is an async generator with two output channels:
@@ -1541,6 +1577,114 @@ exposed tool uses, then yield the real assistant API error and return
 
 Repairing missing results preserves the invariant that every exposed
 `tool_use` has a matching `tool_result`, even though no later API call occurs.
+
+### This is the exceptional path, not ordinary network recovery
+
+The comment at `query.ts:980-983` is an important scope boundary:
+`queryModelWithStreaming()` normally converts API failures into synthetic
+assistant messages, or retries a failed stream through its non-streaming
+fallback. The outer catch exists for errors that unexpectedly escape that
+lower layer, including runtime bugs after some model blocks have already been
+yielded.
+
+Ordinary mid-stream fallback follows the repair path described in
+[Streaming fallback repair](#streaming-fallback-repair-queryts709-741): it
+tombstones the partial attempt, clears its accumulators, discards its executor,
+and accepts a complete replacement response. The behavior below applies when
+that recovery does not contain the failure.
+
+### Completed and incomplete model blocks
+
+The API adapter creates an `AssistantMessage` only after receiving
+`content_block_stop` (`services/api/claude.ts:2171-2211`). Consequently, if a
+failure occurs between two blocks:
+
+```text
+API message id X
+  thinking       content_block_stop received -> already yielded
+  text           content_block_stop received -> already yielded
+  tool_use A     content_block_stop received -> already yielded
+  tool_use B     still partial                -> never yielded
+```
+
+The completed fragments can already be visible and persisted. The incomplete
+`tool_use B` has not become an internal assistant message and cannot be
+reconstructed by the error handler.
+
+### Missing-tool-result synthesis (`query.ts:123-149`, `980-984`)
+
+`yieldMissingToolResultBlocks()` scans every `tool_use` in
+`assistantMessages` and emits an error user message:
+
+```text
+assistant: tool_use A
+user:      tool_result A, is_error=true, content=<thrown error>
+```
+
+This provides structural closure for a tool request that otherwise would have
+no result. The helper, however, does not inspect the accumulated `toolResults`
+array or the streaming executor's `yielded` state. If streaming execution
+already yielded a real result before the model loop threw, the exceptional
+path can emit a second result for the same ID:
+
+```text
+assistant: tool_use A
+user:      real tool_result A
+user:      synthetic error tool_result A   <- duplicate ID
+```
+
+This is a limitation of the defensive handler. The raw session transcript can
+contain both results. Before a later API call, `ensureToolResultPairing()`
+deduplicates tool results, strips orphaned results, and inserts placeholders
+for missing results (`utils/messages.ts:5133-5459`), so the malformed
+transcript does not normally deadlock API replay. That later normalization is
+repair, not proof that the persisted event history was duplication-free.
+
+A stricter exceptional cleanup would derive the set of already-resolved
+`tool_use_id` values from accumulated/yielded executor results and synthesize
+errors only for unresolved IDs. It would also abort or drain the executor so a
+late real result cannot follow a synthetic result.
+
+### Synthetic assistant API-error message (`query.ts:986-992`)
+
+After tool-pair repair, the catch yields `createAssistantAPIErrorMessage()` to
+surface and persist the actual failure. This message is not primarily an
+assistant half inserted to enforce user/assistant role alternation. It is an
+observable terminal error record for the UI, SDK caller, and transcript.
+
+If a real text block completed before the exception, the internal event history
+can therefore contain two assistant records:
+
+```text
+user:      original request
+assistant: real text received before failure
+assistant: synthetic API error
+```
+
+They are not two successful model turns. Claude Code stores completed response
+blocks as separate assistant fragments, and the second record is explicitly
+synthetic. `normalizeMessagesForAPI()` filters synthetic API-error messages
+before constructing the next request (`utils/messages.ts:2017-2053`,
+`2066-2072`). The model-facing replay retains the genuine completed text but
+does not receive the synthetic error text.
+
+If no real assistant block completed, only the synthetic error is exposed and
+persisted. Because that record is also filtered from the next API payload, a
+later retry effectively starts from the already-persisted user request. If
+there were no tool uses, `yieldMissingToolResultBlocks()` emits nothing and
+only this synthetic assistant error is yielded.
+
+The guarantees of this branch are therefore deliberately narrower than atomic
+turn persistence:
+
+- completed model blocks remain observable; incomplete blocks disappear;
+- every observed unresolved tool request is intended to receive terminal
+  error closure, although already-resolved IDs can currently be duplicated;
+- the real exception remains visible in the transcript and caller event stream;
+- API normalization removes the synthetic assistant error and repairs tool
+  pairing before replay;
+- Claude Code reconstructs a structurally usable API conversation, not the
+  missing remainder of the original response.
 
 ---
 

@@ -1,138 +1,34 @@
-// Readable timeline/table view for file-history snapshots in the sample main-agent session.
-// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
-//
-// Render example:
-//   dot -Tsvg docs/design/storage-session-sample-main-file-history-timeline.dot -o /tmp/storage-session-sample-main-file-history-timeline.svg
-//
-// This is intentionally a table diagram, not an edge graph. The edge graph version
-// is faithful, but it is hard to read because file-history snapshots repeatedly
-// point at the same message/file-state nodes.
-
+// Readable timeline/table view for full file-history snapshots and per-file deltas.
+// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/a567f577-8ea3-49dc-90e3-bb47d535cfdd.jsonl
 digraph sample_main_session_file_history_timeline {
-  graph [
-    label="Sample main-agent file-history snapshot timeline\ncd51bba4-3e67-4577-9a9c-1293e0100eff",
-    labelloc=t,
-    fontsize=22,
-    rankdir=TB
-  ];
-
+  graph [label="Sample main-agent file-history snapshot/delta timeline\na567f577-8ea3-49dc-90e3-bb47d535cfdd", labelloc=t, fontsize=22, rankdir=TB];
   node [shape=plain, fontname="Menlo"];
-
-  timeline [
-    label=<
-      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
-        <TR>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>JSONL line</B></FONT></TD>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Entry kind</B></FONT></TD>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>messageId target</B></FONT></TD>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>snapshot.messageId target</B></FONT></TD>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Tracked backup state</B></FONT></TD>
-          <TD BGCOLOR="#333333"><FONT COLOR="white"><B>Meaning</B></FONT></TD>
-        </TR>
-
-        <TR>
-          <TD>L002</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L006 aa6082e8<BR/>USER /clear</TD>
-          <TD>SAME</TD>
-          <TD>{}</TD>
-          <TD>Initial restorable user-message checkpoint; no files tracked yet.</TD>
-        </TR>
-        <TR>
-          <TD>L008</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L009 2c7b6c0e<BR/>USER create FastAPI app</TD>
-          <TD>SAME</TD>
-          <TD>{}</TD>
-          <TD>First real prompt checkpoint; no file-history-aware writes yet.</TD>
-        </TR>
-        <TR>
-          <TD>L085</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L086 31fe1d82<BR/>USER keep it minimal</TD>
-          <TD>SAME</TD>
-          <TD>{}</TD>
-          <TD>Checkpoint before the turn that creates the design spec.</TD>
-        </TR>
-        <TR>
-          <TD>L096</TD>
-          <TD BGCOLOR="#ffd0b0"><B>update</B></TD>
-          <TD>L095 202469bd<BR/>ASSIST tool_use:Write</TD>
-          <TD>L086 31fe1d82<BR/>USER keep it minimal</TD>
-          <TD>spec/design.md = null, v1</TD>
-          <TD>Write created a new spec file. Null means the pre-write state was "file did not exist".</TD>
-        </TR>
-        <TR>
-          <TD>L118</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L117 9f9344a3<BR/>USER Approved</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2</TD>
-          <TD>Next checkpoint captures the existing spec file contents as the first physical backup blob.</TD>
-        </TR>
-        <TR>
-          <TD>L135</TD>
-          <TD BGCOLOR="#ffd0b0"><B>update</B></TD>
-          <TD>L134 d9dae2bb<BR/>ASSIST tool_use:Write</TD>
-          <TD>L117 9f9344a3<BR/>USER Approved</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = null, v1</TD>
-          <TD>Write created a new plan file and updates the latest base snapshot.</TD>
-        </TR>
-        <TR>
-          <TD>L160</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L161 f3a60c2f<BR/>USER 1</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
-          <TD>Next checkpoint captures the existing plan file contents as a physical backup blob.</TD>
-        </TR>
-        <TR>
-          <TD>L445</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L446 f5078f39<BR/>USER 1</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
-          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
-        </TR>
-        <TR>
-          <TD>L450</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L448 7769c29c<BR/>USER 1</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
-          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
-        </TR>
-        <TR>
-          <TD>L485</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L486 9fc35f88<BR/>USER list full tasks</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
-          <TD>Later checkpoint reuses unchanged backup metadata.</TD>
-        </TR>
-        <TR>
-          <TD>L501</TD>
-          <TD BGCOLOR="#ffe0cc">base</TD>
-          <TD>L500 88a467b7<BR/>USER show session ID</TD>
-          <TD>SAME</TD>
-          <TD>spec/design.md = da8c25ed54b72cc4@v2<BR/>plan.md = 407d6e14c9eed3f5@v2</TD>
-          <TD>Latest observed checkpoint reuses unchanged backup metadata.</TD>
-        </TR>
-      </TABLE>
-    >
-  ];
-
-  legend [
-    label=<
-      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
-        <TR><TD BGCOLOR="#eeeeee"><B>Path abbreviation</B></TD><TD BGCOLOR="#eeeeee"><B>Full path in trackedFileBackups</B></TD></TR>
-        <TR><TD>spec/design.md</TD><TD>docs/superpowers/specs/2026-06-03-lang-reference-guide-design.md</TD></TR>
-        <TR><TD>plan.md</TD><TD>docs/superpowers/plans/2026-06-03-lang-reference-guide.md</TD></TR>
-        <TR><TD>null</TD><TD>No physical blob. The file did not exist at the captured pre-write state.</TD></TR>
-        <TR><TD>SAME</TD><TD>For base snapshots, top-level messageId and snapshot.messageId point to the same user message.</TD></TR>
-      </TABLE>
-    >
-  ];
-
+  timeline [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7">
+      <TR><TD BGCOLOR="#333333"><FONT COLOR="white"><B>line</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>kind</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>messageId target</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>base snapshot</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>backup state</B></FONT></TD></TR>
+      <TR><TD>L007</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L008 740303b2 USER Create An Web application called `game-ra...</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L066</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L067 d656f49d USER No, keep it text-only, let's continue</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L108</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L109 17e8dcf7 USER Right</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L119</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L120 755deb4d USER Right</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L125</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L126 ee8248e4 USER Right</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L131</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L132 9cc905cd USER Right</TD><TD>self</TD><TD ALIGN="LEFT">{}</TD></TR>
+      <TR><TD>L143</TD><TD BGCOLOR="#ffd0b0"><B>delta</B></TD><TD ALIGN="LEFT">L142 32b52d6b ASSIST tool_use:Write</TD><TD>9cc905cd</TD><TD ALIGN="LEFT">2026-08-19-game-raiden-design.md=null v1</TD></TR>
+      <TR><TD>L159</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L157 27264573 USER Approved</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2</TD></TR>
+      <TR><TD>L231</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L232 50bf054a USER Go</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2</TD></TR>
+      <TR><TD>L245</TD><TD BGCOLOR="#ffd0b0"><B>delta</B></TD><TD ALIGN="LEFT">L247 082c4d55 ASSIST tool_use:Write</TD><TD>50bf054a</TD><TD ALIGN="LEFT">2026-08-19-game-raiden.md=null v1</TD></TR>
+      <TR><TD>L282</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L280 3078f5b7 USER 1</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden.md=fb940146e804c3d2@v2 v2<BR ALIGN="LEFT"/>2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2</TD></TR>
+      <TR><TD>L647</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L645 91d4e31a USER still running, let me know when it's done</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden.md=fb940146e804c3d2@v2 v2<BR ALIGN="LEFT"/>2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2</TD></TR>
+      <TR><TD>L770</TD><TD BGCOLOR="#ffd0b0"><B>delta</B></TD><TD ALIGN="LEFT">L771 13136c75 ASSIST tool_use:Edit</TD><TD>91d4e31a</TD><TD ALIGN="LEFT">.gitignore=1eeff9330bc08d58@v1 v1</TD></TR>
+      <TR><TD>L874</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L870 6e340fa0 USER export</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden.md=fb940146e804c3d2@v3 v3<BR ALIGN="LEFT"/>.gitignore=1eeff9330bc08d58@v2 v2<BR ALIGN="LEFT"/>2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2</TD></TR>
+      <TR><TD>L881</TD><TD BGCOLOR="#ffe0cc">snapshot</TD><TD ALIGN="LEFT">L883 1a3bf181 USER &lt;command-name&gt;/export&lt;/command-name&gt; &lt;com...</TD><TD>self</TD><TD ALIGN="LEFT">2026-08-19-game-raiden-design.md=e8a8fa646bc5d644@v2 v2<BR ALIGN="LEFT"/>.gitignore=1eeff9330bc08d58@v2 v2<BR ALIGN="LEFT"/>2026-08-19-game-raiden.md=fb940146e804c3d2@v3 v3</TD></TR>
+    </TABLE>
+  >];
+  legend [label=<
+    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="7">
+      <TR><TD BGCOLOR="#eeeeee"><B>snapshot</B></TD><TD ALIGN="LEFT">Full checkpoint; messageId equals snapshot.messageId in this sample.</TD></TR>
+      <TR><TD BGCOLOR="#ffd0b0"><B>delta</B></TD><TD ALIGN="LEFT">Per-path update; snapshotMessageId identifies the base full snapshot.</TD></TR>
+      <TR><TD><B>null</B></TD><TD ALIGN="LEFT">No physical blob; the path did not exist at the captured pre-edit state.</TD></TR>
+    </TABLE>
+  >];
   timeline -> legend [style=invis];
 }

@@ -1,127 +1,101 @@
 // Focused file-history map for the sample main-agent session.
-// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
-//
-// Render example:
-//   dot -Tsvg docs/design/storage-session-sample-main-file-history-map.dot -o /tmp/storage-session-sample-main-file-history-map.svg
-//
-// Why this file exists:
-//   The full append-log graph has 515 nodes and several relationship types, which makes
-//   the rendered SVG hard to read. This focused graph shows only the file-history
-//   snapshot entries, the transcript messages they reference, and the tracked backup
-//   states those snapshots record.
-//
-// Edge legend:
-//   black solid   = snapshot append order
-//   orange dashed = file-history-snapshot.messageId
-//   red dotted    = file-history-snapshot.snapshot.messageId for update entries
-//   purple solid  = tracked file backup state recorded by that snapshot
-
+// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/a567f577-8ea3-49dc-90e3-bb47d535cfdd.jsonl
+// Edge legend: black=append order, orange=messageId, red=delta base, purple=backup state.
 digraph sample_main_session_file_history_map {
-  graph [
-    label="Sample main-agent file-history snapshot map\ncd51bba4-3e67-4577-9a9c-1293e0100eff",
-    labelloc=t,
-    fontsize=22,
-    rankdir=LR,
-    splines=true,
-    concentrate=false,
-    nodesep=0.45,
-    ranksep=0.75
-  ];
-
-  node [fontname="Menlo", fontsize=10, margin="0.08,0.05"];
-  edge [fontname="Menlo", fontsize=9, arrowsize=0.65];
-
-  subgraph cluster_snapshots {
-    label="file-history-snapshot JSONL entries";
-    color="#dddddd";
-    style="rounded";
-
-    fh002 [label="L002 FILE HISTORY\nbase\nmessageId=aa6082e8\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh008 [label="L008 FILE HISTORY\nbase\nmessageId=2c7b6c0e\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh085 [label="L085 FILE HISTORY\nbase\nmessageId=31fe1d82\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh096 [label="L096 FILE HISTORY\nupdate\nmessageId=202469bd\nsnapshot.messageId=31fe1d82\ntracked=1", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
-    fh118 [label="L118 FILE HISTORY\nbase\nmessageId=9f9344a3\ntracked=1", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh135 [label="L135 FILE HISTORY\nupdate\nmessageId=d9dae2bb\nsnapshot.messageId=9f9344a3\ntracked=2", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
-    fh160 [label="L160 FILE HISTORY\nbase\nmessageId=f3a60c2f\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh445 [label="L445 FILE HISTORY\nbase\nmessageId=f5078f39\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh450 [label="L450 FILE HISTORY\nbase\nmessageId=7769c29c\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh485 [label="L485 FILE HISTORY\nbase\nmessageId=9fc35f88\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
-    fh501 [label="L501 FILE HISTORY\nbase\nmessageId=88a467b7\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
-
-    fh002 -> fh008;
-    fh008 -> fh085;
-    fh085 -> fh096;
-    fh096 -> fh118;
-    fh118 -> fh135;
-    fh135 -> fh160;
-    fh160 -> fh445;
-    fh445 -> fh450;
-    fh450 -> fh485;
-    fh485 -> fh501;
+  graph [label="Sample main-agent file-history snapshot/delta map\na567f577-8ea3-49dc-90e3-bb47d535cfdd", labelloc=t, fontsize=22, rankdir=LR, splines=true, concentrate=false, nodesep=0.45, ranksep=0.75];
+  node [fontname="Menlo", fontsize=9, margin="0.08,0.05"];
+  edge [fontname="Menlo", fontsize=8, arrowsize=0.65];
+  subgraph cluster_history {
+    label="file-history append rows"; color="#dddddd"; style="rounded";
+    fh7 [label="L007 SNAPSHOT\nmessage=740303b2\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh66 [label="L066 SNAPSHOT\nmessage=d656f49d\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh108 [label="L108 SNAPSHOT\nmessage=17e8dcf7\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh119 [label="L119 SNAPSHOT\nmessage=755deb4d\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh125 [label="L125 SNAPSHOT\nmessage=ee8248e4\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh131 [label="L131 SNAPSHOT\nmessage=9cc905cd\ntracked=0", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh143 [label="L143 DELTA\nmessage=32b52d6b\nbase=9cc905cd\ntracked=1", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
+    fh159 [label="L159 SNAPSHOT\nmessage=27264573\ntracked=1", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh231 [label="L231 SNAPSHOT\nmessage=50bf054a\ntracked=1", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh245 [label="L245 DELTA\nmessage=082c4d55\nbase=50bf054a\ntracked=1", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
+    fh282 [label="L282 SNAPSHOT\nmessage=3078f5b7\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh647 [label="L647 SNAPSHOT\nmessage=91d4e31a\ntracked=2", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh770 [label="L770 DELTA\nmessage=13136c75\nbase=91d4e31a\ntracked=1", shape=component, style="filled,bold", fillcolor="#ffd0b0", color="#cc6633", penwidth=2];
+    fh874 [label="L874 SNAPSHOT\nmessage=6e340fa0\ntracked=3", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh881 [label="L881 SNAPSHOT\nmessage=1a3bf181\ntracked=3", shape=component, style="filled", fillcolor="#ffe0cc"];
+    fh7 -> fh66;
+    fh66 -> fh108;
+    fh108 -> fh119;
+    fh119 -> fh125;
+    fh125 -> fh131;
+    fh131 -> fh143;
+    fh143 -> fh159;
+    fh159 -> fh231;
+    fh231 -> fh245;
+    fh245 -> fh282;
+    fh282 -> fh647;
+    fh647 -> fh770;
+    fh770 -> fh874;
+    fh874 -> fh881;
   }
-
   subgraph cluster_messages {
-    label="referenced transcript messages";
-    color="#dddddd";
-    style="rounded";
-
-    msg006 [label="L006 aa6082e8\nUSER\n/clear command", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg009 [label="L009 2c7b6c0e\nUSER\nCreate FastAPI language reference guide app", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg086 [label="L086 31fe1d82\nUSER\nkeep it minimal, lang-reference-guide is fine", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg095 [label="L095 202469bd\nASSIST\ntool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
-    msg117 [label="L117 9f9344a3\nUSER\nApproved", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg134 [label="L134 d9dae2bb\nASSIST\ntool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
-    msg161 [label="L161 f3a60c2f\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg446 [label="L446 f5078f39\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg448 [label="L448 7769c29c\nUSER\n1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg486 [label="L486 9fc35f88\nUSER\nList the full tasks in this session", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
-    msg500 [label="L500 88a467b7\nUSER\nShow me current session ID", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    label="referenced transcript messages"; color="#dddddd"; style="rounded";
+    msg_740303b2_f6b4_4910_b6be_61a00ca3c364 [label="L008 740303b2 USER Create An Web application called `game-ra...", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_d656f49d_62fd_41e3_ab33_8b990e3ce2df [label="L067 d656f49d USER No, keep it text-only, let's continue", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_17e8dcf7_1b8a_49c0_9ea1_b8aa0a453e8d [label="L109 17e8dcf7 USER Right", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_755deb4d_9471_4210_96e4_7e08438223b3 [label="L120 755deb4d USER Right", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_ee8248e4_f84f_4dd3_acd9_5d52c51ac1eb [label="L126 ee8248e4 USER Right", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_9cc905cd_c090_482c_9d9c_df159055cf8b [label="L132 9cc905cd USER Right", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_32b52d6b_a690_403d_9016_9dcb6e0cdaf9 [label="L142 32b52d6b ASSIST tool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
+    msg_27264573_fe87_4b13_892d_a54b0550923b [label="L157 27264573 USER Approved", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_50bf054a_7cd8_4226_b16d_f378d98e3325 [label="L232 50bf054a USER Go", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_082c4d55_67a7_488f_b521_c10ec4d03bac [label="L247 082c4d55 ASSIST tool_use:Write", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
+    msg_3078f5b7_2a8e_4c46_8648_7088f287ee7e [label="L280 3078f5b7 USER 1", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_91d4e31a_518f_428b_a69a_0635a152fdbb [label="L645 91d4e31a USER still running, let me know when it's done", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_13136c75_037d_4934_ba4b_d7bd78ca1dfd [label="L771 13136c75 ASSIST tool_use:Edit", shape=box, style="rounded,filled", fillcolor="#e6f0ff"];
+    msg_6e340fa0_97f7_4f31_bdd1_d03e71448a86 [label="L870 6e340fa0 USER export", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
+    msg_1a3bf181_ca60_4e30_ab73_d680387e0eaf [label="L883 1a3bf181 USER <command-name>/export</command-name> <com...", shape=box, style="rounded,filled", fillcolor="#fff3d9"];
   }
-
-  subgraph cluster_file_states {
-    label="tracked file backup states";
-    color="#dddddd";
-    style="rounded";
-
-    no_files [label="trackedFileBackups = {}", shape=note, style="filled", fillcolor="#f5f5f5"];
-    spec_null [label="spec/design.md\nbackupFileName=null\nversion=1\npre-write state: file did not exist", shape=note, style="filled", fillcolor="#f5f5ff"];
-    spec_v2 [label="spec/design.md\nda8c25ed54b72cc4@v2\nversion=2", shape=note, style="filled", fillcolor="#f5f5ff"];
-    plan_null [label="plan.md\nbackupFileName=null\nversion=1\npre-write state: file did not exist", shape=note, style="filled", fillcolor="#f5f5ff"];
-    plan_v2 [label="plan.md\n407d6e14c9eed3f5@v2\nversion=2", shape=note, style="filled", fillcolor="#f5f5ff"];
+  subgraph cluster_states {
+    label="unique tracked backup states"; color="#dddddd"; style="rounded";
+    state0 [label="docs/superpowers/specs/2026-08-19-game-raiden-design.md\nnull v1\nparent=/home/xiaos/git/gabriel/python/docs/sup...", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state1 [label="docs/superpowers/specs/2026-08-19-game-raiden-design.md\ne8a8fa646bc5d644@v2 v2\nparent=/home/xiaos/git/gabriel/python/docs/sup...", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state2 [label="docs/superpowers/plans/2026-08-19-game-raiden.md\nnull v1\nparent=/home/xiaos/git/gabriel/python-workspac...", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state3 [label="docs/superpowers/plans/2026-08-19-game-raiden.md\nfb940146e804c3d2@v2 v2\nparent=/home/xiaos/git/gabriel/python-workspac...", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state4 [label=".gitignore\n1eeff9330bc08d58@v1 v1\nparent=/home/xiaos/git/gabriel/python-workspace", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state5 [label="docs/superpowers/plans/2026-08-19-game-raiden.md\nfb940146e804c3d2@v3 v3\nparent=/home/xiaos/git/gabriel/python-workspac...", shape=note, style="filled", fillcolor="#f5f5ff"];
+    state6 [label=".gitignore\n1eeff9330bc08d58@v2 v2\nparent=/home/xiaos/git/gabriel/python-workspace", shape=note, style="filled", fillcolor="#f5f5ff"];
   }
-
-  // Snapshot order is already shown in the snapshot cluster. The following edges
-  // show each snapshot's storage references.
-
-  fh002 -> msg006 [color="#e68632", style="dashed", label="messageId"];
-  fh008 -> msg009 [color="#e68632", style="dashed", label="messageId"];
-  fh085 -> msg086 [color="#e68632", style="dashed", label="messageId"];
-  fh096 -> msg095 [color="#e68632", style="dashed", label="messageId"];
-  fh096 -> msg086 [color="#cc3333", style="dotted", penwidth=2, label="snapshot.messageId"];
-  fh118 -> msg117 [color="#e68632", style="dashed", label="messageId"];
-  fh135 -> msg134 [color="#e68632", style="dashed", label="messageId"];
-  fh135 -> msg117 [color="#cc3333", style="dotted", penwidth=2, label="snapshot.messageId"];
-  fh160 -> msg161 [color="#e68632", style="dashed", label="messageId"];
-  fh445 -> msg446 [color="#e68632", style="dashed", label="messageId"];
-  fh450 -> msg448 [color="#e68632", style="dashed", label="messageId"];
-  fh485 -> msg486 [color="#e68632", style="dashed", label="messageId"];
-  fh501 -> msg500 [color="#e68632", style="dashed", label="messageId"];
-
-  fh002 -> no_files [color="#8a5fbf", label="tracked"];
-  fh008 -> no_files [color="#8a5fbf", label="tracked"];
-  fh085 -> no_files [color="#8a5fbf", label="tracked"];
-  fh096 -> spec_null [color="#8a5fbf", label="tracked"];
-  fh118 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh135 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh135 -> plan_null [color="#8a5fbf", label="tracked"];
-  fh160 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh160 -> plan_v2 [color="#8a5fbf", label="tracked"];
-  fh445 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh445 -> plan_v2 [color="#8a5fbf", label="tracked"];
-  fh450 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh450 -> plan_v2 [color="#8a5fbf", label="tracked"];
-  fh485 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh485 -> plan_v2 [color="#8a5fbf", label="tracked"];
-  fh501 -> spec_v2 [color="#8a5fbf", label="tracked"];
-  fh501 -> plan_v2 [color="#8a5fbf", label="tracked"];
+  fh7 -> msg_740303b2_f6b4_4910_b6be_61a00ca3c364 [color="#e68632", style="dashed", label="messageId"];
+  fh66 -> msg_d656f49d_62fd_41e3_ab33_8b990e3ce2df [color="#e68632", style="dashed", label="messageId"];
+  fh108 -> msg_17e8dcf7_1b8a_49c0_9ea1_b8aa0a453e8d [color="#e68632", style="dashed", label="messageId"];
+  fh119 -> msg_755deb4d_9471_4210_96e4_7e08438223b3 [color="#e68632", style="dashed", label="messageId"];
+  fh125 -> msg_ee8248e4_f84f_4dd3_acd9_5d52c51ac1eb [color="#e68632", style="dashed", label="messageId"];
+  fh131 -> msg_9cc905cd_c090_482c_9d9c_df159055cf8b [color="#e68632", style="dashed", label="messageId"];
+  fh143 -> msg_32b52d6b_a690_403d_9016_9dcb6e0cdaf9 [color="#e68632", style="dashed", label="messageId"];
+  fh143 -> fh131 [color="#cc3333", style="dotted", penwidth=2, label="snapshotMessageId"];
+  fh143 -> state0 [color="#8a5fbf", label="tracked"];
+  fh159 -> msg_27264573_fe87_4b13_892d_a54b0550923b [color="#e68632", style="dashed", label="messageId"];
+  fh159 -> state1 [color="#8a5fbf", label="tracked"];
+  fh231 -> msg_50bf054a_7cd8_4226_b16d_f378d98e3325 [color="#e68632", style="dashed", label="messageId"];
+  fh231 -> state1 [color="#8a5fbf", label="tracked"];
+  fh245 -> msg_082c4d55_67a7_488f_b521_c10ec4d03bac [color="#e68632", style="dashed", label="messageId"];
+  fh245 -> fh231 [color="#cc3333", style="dotted", penwidth=2, label="snapshotMessageId"];
+  fh245 -> state2 [color="#8a5fbf", label="tracked"];
+  fh282 -> msg_3078f5b7_2a8e_4c46_8648_7088f287ee7e [color="#e68632", style="dashed", label="messageId"];
+  fh282 -> state3 [color="#8a5fbf", label="tracked"];
+  fh282 -> state1 [color="#8a5fbf", label="tracked"];
+  fh647 -> msg_91d4e31a_518f_428b_a69a_0635a152fdbb [color="#e68632", style="dashed", label="messageId"];
+  fh647 -> state3 [color="#8a5fbf", label="tracked"];
+  fh647 -> state1 [color="#8a5fbf", label="tracked"];
+  fh770 -> msg_13136c75_037d_4934_ba4b_d7bd78ca1dfd [color="#e68632", style="dashed", label="messageId"];
+  fh770 -> fh647 [color="#cc3333", style="dotted", penwidth=2, label="snapshotMessageId"];
+  fh770 -> state4 [color="#8a5fbf", label="tracked"];
+  fh874 -> msg_6e340fa0_97f7_4f31_bdd1_d03e71448a86 [color="#e68632", style="dashed", label="messageId"];
+  fh874 -> state5 [color="#8a5fbf", label="tracked"];
+  fh874 -> state6 [color="#8a5fbf", label="tracked"];
+  fh874 -> state1 [color="#8a5fbf", label="tracked"];
+  fh881 -> msg_1a3bf181_ca60_4e30_ab73_d680387e0eaf [color="#e68632", style="dashed", label="messageId"];
+  fh881 -> state1 [color="#8a5fbf", label="tracked"];
+  fh881 -> state6 [color="#8a5fbf", label="tracked"];
+  fh881 -> state5 [color="#8a5fbf", label="tracked"];
 }

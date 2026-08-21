@@ -1,211 +1,357 @@
-// Metadata-only timeline for no-UUID rows in the sample main-agent session.
-// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/cd51bba4-3e67-4577-9a9c-1293e0100eff.jsonl
-//
-// Render example:
-//   dot -Tsvg docs/design/storage-session-sample-main-metadata-timeline.dot -o /tmp/storage-session-sample-main-metadata-timeline.svg
-//
-// This diagram intentionally excludes UUID-bearing transcript messages. It shows
-// only append-log metadata rows that do not participate directly in parentUuid
-// traversal: file-history-snapshot, last-prompt, ai-title, mode, and permission-mode.
-// Total no-UUID metadata rows: 137
-//   file-history-snapshot: 11
-//   last-prompt: 28
-//   ai-title: 36
-//   mode: 36
-//   permission-mode: 26
+// Metadata-only timeline for all no-UUID rows in the sample main-agent session.
+// Source: /home/xiaos/.claude/projects/-home-xiaos-git-gabriel-python/a567f577-8ea3-49dc-90e3-bb47d535cfdd.jsonl
+// Total no-UUID metadata rows: 335
+//   ai-title: 39
+//   atis-latch: 41
+//   file-history-delta: 3
+//   file-history-snapshot: 12
+//   last-prompt: 43
+//   mode: 40
+//   permission-mode: 40
+//   queue-operation: 48
+//   relocated: 35
+//   worktree-state: 34
 digraph sample_main_session_metadata_timeline {
-  graph [
-    label="Sample main-agent no-UUID metadata timeline\ncd51bba4-3e67-4577-9a9c-1293e0100eff",
-    labelloc=t,
-    fontsize=22,
-    rankdir=TB,
-    nodesep=0.4,
-    ranksep=0.55
-  ];
+  graph [label="Sample main-agent no-UUID metadata timeline\na567f577-8ea3-49dc-90e3-bb47d535cfdd", labelloc=t, fontsize=22, rankdir=TB];
   node [shape=plain, fontname="Menlo"];
-
-  summary [label=<
+  timeline [label=<
     <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333"><FONT COLOR="white"><B>metadata type</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>count</B></FONT></TD></TR>
-      <TR><TD ALIGN="LEFT">file-history-snapshot</TD><TD>11</TD></TR><TR><TD ALIGN="LEFT">last-prompt</TD><TD>28</TD></TR><TR><TD ALIGN="LEFT">ai-title</TD><TD>36</TD></TR><TR><TD ALIGN="LEFT">mode</TD><TD>36</TD></TR><TR><TD ALIGN="LEFT">permission-mode</TD><TD>26</TD></TR>
+      <TR><TD BGCOLOR="#333333"><FONT COLOR="white"><B>line</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>metadata type</B></FONT></TD><TD BGCOLOR="#333333"><FONT COLOR="white"><B>value / relationship</B></FONT></TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L001</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=3d98ad8a </TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L002</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L003</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L004</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L007</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=740303b2 tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L012</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=82375f82 Create An Web application called `game-raiden` th...</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L013</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L014</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L015</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L016</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L032</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=23bce419 Create An Web application called `game-raiden` th...</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L033</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L034</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L035</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L036</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L058</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=c95148ad Create An Web application called `game-raiden` th...</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L059</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L060</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L061</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L062</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L066</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=d656f49d tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L088</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=f7fc6f03 No, keep it text-only, let's continue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L089</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L090</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L091</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L092</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L108</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=17e8dcf7 tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L114</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=44434fbf Right</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L115</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L116</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L117</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L118</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L119</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=755deb4d tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L125</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">message=ee8248e4 tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L131</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=9cc905cd tracked=0</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L143</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-delta</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">base=9cc905cd path=docs/superpowers/specs/2026-08-19-game-raiden-design.md backup=null v1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L146</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=8aac3a7e Right</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L147</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L148</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L149</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L150</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L159</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">message=27264573 tracked=1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L166</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L167</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L168</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L182</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=b1833e1b Approved</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L183</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L184</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L185</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L186</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L187</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L188</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L214</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=0548b508 Approved</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L215</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L216</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L217</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L218</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L219</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L220</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L224</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=17ee52c7 Approved</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L225</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L226</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L227</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L228</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L229</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L230</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L231</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=50bf054a tracked=1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L238</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=16c00318 Go</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L239</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L240</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L241</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L242</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L243</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L244</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L245</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-delta</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">base=50bf054a path=docs/superpowers/plans/2026-08-19-game-raiden.md backup=null v1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L250</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=2432d667 Go</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L251</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L252</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L253</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L254</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L255</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L256</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L273</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=b4695e38 Go</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L274</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L275</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L276</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L277</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L278</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L279</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L282</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">message=3078f5b7 tracked=2</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L297</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=5bce5268 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L298</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L299</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L300</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L301</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L302</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L303</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L327</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=1ccd02a4 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L328</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L329</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L330</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L331</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L332</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L333</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L336</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L337</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L344</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=9dd3ea42 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L345</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L346</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L347</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L348</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L349</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L350</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L353</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L354</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L362</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L363</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L365</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=a5c92c23 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L366</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L367</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L368</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L369</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L370</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L371</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L384</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=e8d96fdb 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L385</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L386</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L387</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L388</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L389</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L390</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L391</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L392</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L400</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L401</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L403</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=965f36f6 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L404</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L405</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L406</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L407</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L408</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L409</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L416</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L417</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L428</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=a9464b85 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L429</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L430</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L431</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L432</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L433</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L434</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L437</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L438</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L446</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L447</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L449</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=c006f50a 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L450</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L451</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L452</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L453</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L454</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L455</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L462</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L463</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L472</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=e9168fbf 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L473</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L474</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L475</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L476</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L477</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L478</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L484</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L485</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L492</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=14cc6aa5 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L493</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L494</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L495</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L496</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L497</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L498</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L501</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L502</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L510</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L511</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L513</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=1ff554c4 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L514</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L515</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L516</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L517</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L518</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L519</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L532</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L533</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L535</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=88d16f46 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L536</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L537</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L538</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L539</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L540</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L541</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L548</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L549</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L555</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=b74cfb86 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L556</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L557</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L558</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L559</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L560</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L561</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L564</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L565</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L579</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=5ce45ce1 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L580</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L581</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L582</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L583</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L584</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L585</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L593</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=2f0bde06 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L594</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L595</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L596</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L597</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L598</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L599</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L602</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L603</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L609</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=be6b58dc 1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L610</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L611</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L612</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L613</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L614</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L615</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L618</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L619</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L628</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L629</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L631</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=0bfee629 1</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L632</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L633</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L634</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L635</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L636</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L637</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L647</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">message=91d4e31a tracked=2</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L650</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L651</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L657</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=0cf68d65 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L658</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L659</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L660</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L661</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L662</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L663</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L666</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L667</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L676</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L677</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L679</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=e93a7907 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L680</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L681</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L682</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L683</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L684</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L685</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L693</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L694</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L705</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=633659ed still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L706</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L707</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L708</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L709</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L710</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L711</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L733</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=6972fa61 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L734</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L735</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L736</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L737</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L738</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L739</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L742</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L743</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L755</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=a4d5c693 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L756</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L757</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L758</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L759</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L760</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L761</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L770</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-delta</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">base=91d4e31a path=.gitignore backup=1eeff9330bc08d58@v1 v1</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L782</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=7eeb9f49 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L783</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L784</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L785</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L786</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L787</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L788</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L800</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enqueue task-notification</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L801</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">queue-operation</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">dequeue</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L803</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=412488ca still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L804</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L805</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L806</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L807</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L808</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L809</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L829</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=4f9f4dc9 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L830</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L831</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L832</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L833</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L834</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L835</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L853</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=a1fdbb37 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L854</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L855</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python-workspace</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L856</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L857</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L858</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L859</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">enter /home/xiaos/git/gabriel/python-workspace branch=game-1024</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L868</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=15025c79 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L869</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=b0c60a24 still running, let me know when it's done</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L874</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">message=6e340fa0 tracked=3</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L876</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">/home/xiaos/git/gabriel/python</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L877</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">worktree-state</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">exit: worktreeSession=null</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L878</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">leaf=619cf590 export</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L879</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">relocated</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">/home/xiaos/git/gabriel/python</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L881</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">file-history-snapshot</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">message=1a3bf181 tracked=3</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L885</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">last-prompt</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">leaf=53aa5cca export</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L886</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">ai-title</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">game-raiden web application</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L887</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">mode</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">normal</TD></TR>
+      <TR><TD BGCOLOR="#f8f8f8">L888</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">permission-mode</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">bypassPermissions</TD></TR>
+      <TR><TD BGCOLOR="#ffffff">L889</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis-latch</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">atis=&quot;&quot;</TD></TR>
     </TABLE>
   >];
-
-  tbl_file_history_snapshot [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333" COLSPAN="5"><FONT COLOR="white"><B>file-history-snapshot (11)</B></FONT></TD></TR>
-      <TR><TD BGCOLOR="#eeeeee"><B>line</B></TD><TD BGCOLOR="#eeeeee"><B>kind</B></TD><TD BGCOLOR="#eeeeee"><B>messageId target</B></TD><TD BGCOLOR="#eeeeee"><B>snapshot.messageId target</B></TD><TD BGCOLOR="#eeeeee"><B>tracked backups</B></TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L002</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L006 aa6082e8 user</TD><TD BGCOLOR="#ffffff">L006 aa6082e8 user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">{}</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L008</TD><TD BGCOLOR="#f8f8f8">base</TD><TD BGCOLOR="#f8f8f8">L009 2c7b6c0e user</TD><TD BGCOLOR="#f8f8f8">L009 2c7b6c0e user</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">{}</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L085</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L086 31fe1d82 user</TD><TD BGCOLOR="#ffffff">L086 31fe1d82 user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">{}</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L096</TD><TD BGCOLOR="#f8f8f8">update</TD><TD BGCOLOR="#f8f8f8">L095 202469bd assistant</TD><TD BGCOLOR="#f8f8f8">L086 31fe1d82 user</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=null v1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L118</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L117 9f9344a3 user</TD><TD BGCOLOR="#ffffff">L117 9f9344a3 user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L135</TD><TD BGCOLOR="#f8f8f8">update</TD><TD BGCOLOR="#f8f8f8">L134 d9dae2bb assistant</TD><TD BGCOLOR="#f8f8f8">L117 9f9344a3 user</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide.md=null v1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L160</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L161 f3a60c2f user</TD><TD BGCOLOR="#ffffff">L161 f3a60c2f user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide.md=407d6e14c9eed3f5@v2 v2</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L445</TD><TD BGCOLOR="#f8f8f8">base</TD><TD BGCOLOR="#f8f8f8">L446 f5078f39 user</TD><TD BGCOLOR="#f8f8f8">L446 f5078f39 user</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide.md=407d6e14c9eed3f5@v2 v2</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L450</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L448 7769c29c user</TD><TD BGCOLOR="#ffffff">L448 7769c29c user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">2026-06-03-lang-reference-guide.md=407d6e14c9eed3f5@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L485</TD><TD BGCOLOR="#f8f8f8">base</TD><TD BGCOLOR="#f8f8f8">L486 9fc35f88 user</TD><TD BGCOLOR="#f8f8f8">L486 9fc35f88 user</TD><TD BGCOLOR="#f8f8f8" ALIGN="LEFT">2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide.md=407d6e14c9eed3f5@v2 v2</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L501</TD><TD BGCOLOR="#ffffff">base</TD><TD BGCOLOR="#ffffff">L500 88a467b7 user</TD><TD BGCOLOR="#ffffff">L500 88a467b7 user</TD><TD BGCOLOR="#ffffff" ALIGN="LEFT">2026-06-03-lang-reference-guide.md=407d6e14c9eed3f5@v2 v2<BR ALIGN="LEFT"/>2026-06-03-lang-reference-guide-design.md=da8c25ed54b72cc4@v2 v2</TD></TR>
-    </TABLE>
-  >];
-
-  tbl_last_prompt [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333" COLSPAN="5"><FONT COLOR="white"><B>last-prompt (28)</B></FONT></TD></TR>
-      <TR><TD BGCOLOR="#eeeeee"><B>line</B></TD><TD BGCOLOR="#eeeeee"><B>leafUuid target</B></TD><TD BGCOLOR="#eeeeee" COLSPAN="3"><B>lastPrompt</B></TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L018</TD><TD BGCOLOR="#ffffff">L017 2e9935ae attachment</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">Create a FastAPI based server app: - managed by uv - project is named "Programming Language Reference Guide" - Use AD...</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L045</TD><TD BGCOLOR="#f8f8f8">L044 f5b9a5d4 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">Create a FastAPI based server app: - managed by uv - project is named "Programming Language Reference Guide" - Use AD...</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L055</TD><TD BGCOLOR="#ffffff">L054 6a71759e user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">Create a FastAPI based server app: - managed by uv - project is named "Programming Language Reference Guide" - Use AD...</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L078</TD><TD BGCOLOR="#f8f8f8">L077 6e612b1d user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">Create a FastAPI based server app: - managed by uv - project is named "Programming Language Reference Guide" - Use AD...</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L098</TD><TD BGCOLOR="#ffffff">L097 4c2a256b user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">keep it minimal, lang-reference-guide is fine</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L124</TD><TD BGCOLOR="#f8f8f8">L123 e9fe3468 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">Approved</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L137</TD><TD BGCOLOR="#ffffff">L136 ba9bb890 user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">Approved</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L149</TD><TD BGCOLOR="#f8f8f8">L148 b5e192e4 system</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">Approved</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L177</TD><TD BGCOLOR="#ffffff">L176 b909dcdb user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L205</TD><TD BGCOLOR="#f8f8f8">L204 41e10e8e user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L220</TD><TD BGCOLOR="#ffffff">L219 452e88b1 assistant</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L234</TD><TD BGCOLOR="#f8f8f8">L233 95589225 attachment</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L252</TD><TD BGCOLOR="#ffffff">L251 819af097 user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L263</TD><TD BGCOLOR="#f8f8f8">L262 ce754b37 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L281</TD><TD BGCOLOR="#ffffff">L280 d404443a user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L292</TD><TD BGCOLOR="#f8f8f8">L291 5a135bbf user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L312</TD><TD BGCOLOR="#ffffff">L311 3d73980f assistant</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L329</TD><TD BGCOLOR="#f8f8f8">L328 076b11d3 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L339</TD><TD BGCOLOR="#ffffff">L338 e689284d user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L349</TD><TD BGCOLOR="#f8f8f8">L348 43af5857 assistant</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L364</TD><TD BGCOLOR="#ffffff">L363 1079e505 user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L375</TD><TD BGCOLOR="#f8f8f8">L374 160e2a15 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L392</TD><TD BGCOLOR="#ffffff">L391 84edf0c7 assistant</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L405</TD><TD BGCOLOR="#f8f8f8">L404 28abbe76 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L422</TD><TD BGCOLOR="#ffffff">L421 6583b822 user</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L455</TD><TD BGCOLOR="#f8f8f8">L454 303e6902 user</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L472</TD><TD BGCOLOR="#ffffff">L471 5d51d8ea system</TD><TD BGCOLOR="#ffffff" COLSPAN="3" ALIGN="LEFT">1</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L509</TD><TD BGCOLOR="#f8f8f8">L508 ed8fb520 system</TD><TD BGCOLOR="#f8f8f8" COLSPAN="3" ALIGN="LEFT">Show me current session ID</TD></TR>
-    </TABLE>
-  >];
-
-  tbl_ai_title [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333" COLSPAN="5"><FONT COLOR="white"><B>ai-title (36)</B></FONT></TD></TR>
-      <TR><TD BGCOLOR="#eeeeee"><B>line</B></TD><TD BGCOLOR="#eeeeee" COLSPAN="4"><B>aiTitle</B></TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L011</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L019</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L046</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L056</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L079</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L099</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L125</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L138</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L150</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L152</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L154</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L157</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L178</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L206</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L221</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L235</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L253</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L264</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L282</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L293</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L313</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L330</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L340</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L350</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L365</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L376</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L393</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L406</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L423</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L456</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L473</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L476</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L479</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L482</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L510</TD><TD BGCOLOR="#ffffff" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L513</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4" ALIGN="LEFT">Create FastAPI language reference guide server</TD></TR>
-    </TABLE>
-  >];
-
-  tbl_mode [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333" COLSPAN="5"><FONT COLOR="white"><B>mode (36)</B></FONT></TD></TR>
-      <TR><TD BGCOLOR="#eeeeee"><B>line</B></TD><TD BGCOLOR="#eeeeee" COLSPAN="4"><B>mode</B></TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L001</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L020</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L047</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L057</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L080</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L100</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L126</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L139</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L151</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L153</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L155</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L158</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L179</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L207</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L222</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L236</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L254</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L265</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L283</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L294</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L314</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L331</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L341</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L351</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L366</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L377</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L394</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L407</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L424</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L457</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L474</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L477</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L480</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L483</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L511</TD><TD BGCOLOR="#ffffff" COLSPAN="4">normal</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L514</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">normal</TD></TR>
-    </TABLE>
-  >];
-
-  tbl_permission_mode [label=<
-    <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6">
-      <TR><TD BGCOLOR="#333333" COLSPAN="5"><FONT COLOR="white"><B>permission-mode (26)</B></FONT></TD></TR>
-      <TR><TD BGCOLOR="#eeeeee"><B>line</B></TD><TD BGCOLOR="#eeeeee" COLSPAN="4"><B>permissionMode</B></TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L156</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L159</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L180</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L208</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L223</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L237</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L255</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L266</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L284</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L295</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L315</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L332</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L342</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L352</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L367</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L378</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L395</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L408</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L425</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L458</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L475</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L478</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L481</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L484</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#ffffff">L512</TD><TD BGCOLOR="#ffffff" COLSPAN="4">bypassPermissions</TD></TR>
-      <TR><TD BGCOLOR="#f8f8f8">L515</TD><TD BGCOLOR="#f8f8f8" COLSPAN="4">bypassPermissions</TD></TR>
-    </TABLE>
-  >];
-
-  summary -> tbl_file_history_snapshot [style=invis];
-  tbl_file_history_snapshot -> tbl_last_prompt [style=invis];
-  tbl_last_prompt -> tbl_ai_title [style=invis];
-  tbl_ai_title -> tbl_mode [style=invis];
-  tbl_mode -> tbl_permission_mode [style=invis];
 }
