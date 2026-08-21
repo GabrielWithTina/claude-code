@@ -776,24 +776,28 @@ CC-1180 escape hatch — when the compact request itself hits prompt-too-long, t
 
 ```mermaid
 flowchart TD
-    A([summary text starts with\nPROMPT_TOO_LONG_ERROR_MESSAGE]) --> B{ptlAttempts <= MAX_PTL_RETRIES(3)?}
+    A([summary text starts with\nPROMPT_TOO_LONG_ERROR_MESSAGE]) --> B{"ptlAttempts <= MAX_PTL_RETRIES(3)?"}
     B -- no --> X([throw ERROR_MESSAGE_PROMPT_TOO_LONG])
-    B -- yes --> C[strip prior PTL_RETRY_MARKER from messages[0]\notherwise it becomes its own group 0\nand 20% fallback stalls]
+    B -- yes --> C["strip prior PTL_RETRY_MARKER from messages[0]\notherwise it becomes its own group 0\nand 20% fallback stalls"]
     C --> D[groupMessagesByApiRound\nboundary = new assistant message.id]
     D --> E{groups.length < 2?}
     E -- yes --> X
     E -- no --> F{getPromptTooLongTokenGap\nparseable?}
     F -- yes --> G[drop oldest groups\nuntil acc tokens >= gap]
-    F -- no, Vertex/Bedrock --> H[fallback: drop 20% of groups]
+    F -- no, Vertex/Bedrock --> H["fallback: drop 20% of groups"]
     G --> I[cap dropCount at groups.length - 1\nkeep at least one group]
     H --> I
-    I --> J{sliced[0] is assistant?}
+    I --> J{"sliced[0] is assistant?"}
     J -- yes --> K[prepend synthetic user marker\nPTL_RETRY_MARKER\nensureToolResultPairing handles orphan tool_results]
     J -- no --> L([retry summarize])
     K --> L
 ```
 
 `groupMessagesByApiRound()` (`grouping.ts`) uses a single gate: a NEW assistant `message.id` starts a new group. The API contract guarantees every tool_use is resolved before the next assistant turn, so the assistant-id boundary is API-safe by construction. Tracking unresolved tool_use IDs was rejected because it pins the gate shut forever on malformed inputs (dangling tool_use after resume/truncation). For those cases, the fork's own `ensureToolResultPairing` repairs the split at API time.
+
+The groups deliberately do not follow the more intuitive human-turn shape `[user prompt, assistant response]`. Internal `user` messages also carry tool results, so that shape would split a required tool pair across groups: `[u0, a0: tool_use X] [u1: tool_result X, a1]`. Starting a group at each new assistant response instead produces `[u0] [a0: tool_use X, u1: tool_result X] [a1]`, keeping the assistant response and its ensuing tool results removable as one unit. It also gives a single-human-prompt agentic session multiple groups to peel as successive tool rounds accumulate; grouping only by real user prompts would leave that whole workload as one indivisible group and make the retry impossible.
+
+For an ordinary tool-free conversation this boundary can cut across the semantic question-answer pairs—for example, `[u0] [a0, u1] [a1, u2] [a2]`. That is an accepted trade-off in this lossy last-resort path. `truncateHeadForPTLRetry()` drops whole oldest groups until their estimated tokens cover `tokenGap`, always keeps at least one group, and prepends `PTL_RETRY_MARKER` when the retained sequence starts with an assistant message.
 
 ### Post-compact attachments — budgets and dedup
 
