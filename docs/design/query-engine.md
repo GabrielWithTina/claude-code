@@ -96,78 +96,460 @@ classDiagram
 
 ---
 
-## `submitMessage()` Pipeline
+## `submitMessage()` source-order walkthrough (`QueryEngine.ts:209-1156`)
+
+`submitMessage()` is one headless/SDK user turn. It is an async generator with
+three simultaneous responsibilities:
+
+- update the `QueryEngine` instance state that survives into later turns;
+- drive one `query()` invocation and translate its internal event protocol;
+- yield the public SDK event stream, ending with exactly one `result` event on
+  every normal terminal branch.
+
+The caller does not send values back through `next(value)`. It advances the
+generator to receive events. Awaiting a yielded SDK event therefore applies
+backpressure to `submitMessage()`, which in turn can delay consumption of the
+underlying `query()` generator.
+
+### State scopes
+
+The method combines instance state, turn-local state, and configuration
+snapshots. Keeping those scopes separate explains which values accumulate
+across calls and which reset for each submission.
+
+| Scope | Values | Lifecycle |
+| --- | --- | --- |
+| Engine instance | `mutableMessages`, `totalUsage`, `permissionDenials`, `readFileState`, `loadedNestedMemoryPaths` | Created in the constructor and retained across `submitMessage()` calls. |
+| Reset at turn entry | `discoveredSkillNames` | Cleared before processing each new prompt. |
+| Turn-local snapshot | `initialAppState`, initial model/thinking configuration, `persistSession`, `startTime` | Fixed during this call even if selected app-state fields later change. |
+| Query-event accumulators | `messages`, `currentMessageUsage`, `turnCount`, `lastStopReason`, `structuredOutputFromTool`, error watermark | Created after input processing and discarded after the terminal `result`. |
+
+`permissionDenials` and `totalUsage` are intentionally not cleared at turn
+entry. Result messages therefore report the engine's accumulated session view,
+whereas `turnCount` and the structured-output retry delta describe this one
+submission.
+
+### End-to-end sequence
+
+The sequence stays at the `submitMessage()` boundary. Model streaming, tool
+execution, compaction selection, and query-loop recovery are expanded in
+[query-loop-internals.md](./query-loop-internals.md).
 
 ```mermaid
-flowchart TD
-    A([submitMessage called]) --> B[Clear discoveredSkillNames]
-    B --> C["Wrap canUseTool to wrappedCanUseTool<br/>collects SDKPermissionDenial list"]
-    C --> D["fetchSystemPromptParts<br/>build systemPrompt"]
-    D --> E["processUserInput<br/>parse prompt, run slash commands"]
-    E --> F["Push messagesFromUserInput<br/>to mutableMessages"]
-    F --> G["Persist transcript<br/>recordTranscript"]
-    G --> H["Load skills and plugins<br/>getSlashCommandToolSkills"]
-    H --> I["Yield system_init message<br/>tools, model, permissions, skills"]
-    I --> J{shouldQuery?}
+sequenceDiagram
+    autonumber
+    actor Caller as SDK / cli/print caller
+    participant QE as QueryEngine.submitMessage
+    participant Ctx as Prompt and context loaders
+    participant Input as processUserInput
+    participant Catalog as Skills and plugin cache
+    participant Store as sessionStorage
+    participant Q as query()
 
-    J -- No --> K["Yield local slash command output<br/>SDKUserMessageReplay / assistant"]
-    K --> L["Yield result success"]
-    L --> Z([return])
+    Caller->>QE: Start generator with prompt and optional uuid/isMeta
+    QE->>QE: Clear turn skill discoveries, set cwd, snapshot config and time
+    QE->>QE: Create wrappedCanUseTool that records every non-allow decision
+    QE->>Ctx: fetchSystemPromptParts(tools, model, directories, MCP)
+    Ctx-->>QE: defaultSystemPrompt, userContext, systemContext
+    opt Custom prompt plus memory-path override
+        QE->>Ctx: loadMemoryPrompt()
+        Ctx-->>QE: memory mechanics prompt
+    end
+    QE->>QE: Assemble effective system prompt
+    opt Structured-output schema and synthetic output tool are present
+        QE->>QE: Register structured-output enforcement hook
+    end
 
-    J -- Yes --> M["for await message of query<br/>LLM loop"]
-    M --> N{message.type}
+    QE->>QE: Build mutable ProcessUserInputContext
+    opt First submission with an orphaned permission
+        QE->>Input: handleOrphanedPermission(...)
+        Input-->>QE: Zero or more SDK messages
+        QE-->>Caller: yield orphan-recovery messages
+    end
+    QE->>Input: processUserInput(prompt, mode=prompt, querySource=sdk)
+    Input-->>QE: messages, shouldQuery, allowedTools, model, resultText
+    QE->>QE: Append input messages to mutableMessages and snapshot messages
 
-    N -- assistant --> O["push to mutableMessages<br/>yield normalizeMessage"]
-    N -- user --> P["push to mutableMessages<br/>yield normalizeMessage<br/>turnCount++"]
-    N -- progress --> Q["push + transcript write bookkeeping<br/>yield normalizeMessage"]
-    N -- stream_event --> R["update currentMessageUsage<br/>if includePartialMessages: yield"]
-    N -- attachment --> S{attachment.type}
-    N -- system --> T{system subtype}
-    N -- tool_use_summary --> U["yield tool_use_summary"]
+    opt Persistence enabled and input produced messages
+        QE->>Store: recordTranscript(messages)
+        alt Bare mode
+            Note over QE,Store: Fire-and-forget&#59; query startup is not blocked
+        else Normal headless mode
+            Store-->>QE: Input transcript accepted
+            opt Eager-flush or Cowork mode
+                QE->>Store: flushSessionStorage()
+            end
+        end
+    end
 
-    S -- max_turns_reached --> V["yield result error_max_turns<br/>return"]
-    S -- structured_output --> W["capture structuredOutputFromTool"]
-    S -- queued_command --> X["yield SDKUserMessageReplay"]
+    QE->>QE: Select replay acknowledgements and update alwaysAllowRules.command
+    QE->>QE: Resolve post-command model and rebuild ToolUseContext
+    par Load turn catalog data
+        QE->>Catalog: getSlashCommandToolSkills(cwd)
+    and
+        QE->>Catalog: loadAllPluginsCacheOnly()
+    end
+    Catalog-->>QE: skills and enabled plugins
+    QE-->>Caller: yield system init event
 
-    T -- compact_boundary --> Y1["GC pre-compaction messages<br/>yield compact_boundary"]
-    T -- api_error --> Y2["yield api_retry"]
-    T -- snip boundary --> Y3["snipReplay callback<br/>GC zombie messages"]
+    alt shouldQuery is false: local command completed without model execution
+        loop Input messages
+            QE-->>Caller: yield command output, synthetic assistant, or compact boundary
+        end
+        opt Persistence enabled
+            QE->>Store: recordTranscript(messages)
+            opt Eager-flush or Cowork mode
+                QE->>Store: flushSessionStorage()
+            end
+        end
+        QE-->>Caller: yield result(success, resultText, stop_reason=null)
+        QE-->>Caller: return
+    else shouldQuery is true
+        opt File history enabled
+            QE->>QE: Start one fire-and-forget snapshot per selectable input message
+        end
+        QE->>Q: query(messages, contexts, wrappedCanUseTool, limits)
 
-    O --> BudgetCheck
-    P --> BudgetCheck
-    Q --> BudgetCheck
-    R --> BudgetCheck
-    W --> BudgetCheck
-    U --> BudgetCheck
+        loop For each event yielded by query()
+            Q-->>QE: Internal message or control event
 
-    BudgetCheck{Budget exceeded?} -- maxBudgetUsd --> EB["yield result error_max_budget_usd<br/>return"]
-    BudgetCheck -- maxStructuredOutputRetries --> ES["yield result error_max_structured_output_retries<br/>return"]
-    BudgetCheck -- No --> M
+            opt assistant, user, or compact_boundary
+                opt Preserved compact tail must exist durably
+                    QE->>Store: record transcript through preserved tail
+                    Store-->>QE: Tail write accepted
+                end
+                QE->>QE: Append event to turn-local messages
+                alt assistant
+                    QE->>Store: recordTranscript(messages), fire-and-forget
+                    Note over QE,Store: Avoids blocking the upstream stream before message_delta<br/>can finalize usage and stop_reason
+                else user or compact_boundary
+                    QE->>Store: recordTranscript(messages), awaited
+                end
+                opt First transcript-bearing response and replay enabled
+                    QE-->>Caller: yield initial user-message acknowledgement(s)
+                end
+            end
 
-    M -- loop ends --> FinalCheck{isResultSuccessful?}
-    FinalCheck -- No --> EX[yield result error_during_execution\nreturn]
-    FinalCheck -- Yes --> SR[yield result success\nwith textResult, structured_output]
-    SR --> Z
+            alt assistant
+                QE->>QE: Capture synthetic stop reason and append to mutableMessages
+                QE-->>Caller: yield normalized assistant block(s)
+            else user tool result or continuation
+                QE->>QE: Increment turnCount and append to mutableMessages
+                QE-->>Caller: yield normalized user event(s)
+            else progress
+                QE->>QE: Append to both in-memory arrays
+                QE->>Store: Start transcript dedup bookkeeping
+                QE-->>Caller: yield supported normalized progress
+            else stream_event
+                QE->>QE: Reset/update usage&#59; capture stop_reason&#59; accumulate on message_stop
+                opt includePartialMessages
+                    QE-->>Caller: yield raw SDK stream_event
+                end
+            else attachment
+                QE->>QE: Append and start transcript recording
+                opt structured_output
+                    QE->>QE: Save structured result payload
+                end
+                opt queued_command and replay enabled
+                    QE-->>Caller: yield SDK user replay
+                end
+                opt max_turns_reached
+                    QE-->>Caller: yield result(error_max_turns)
+                    QE-->>Caller: return
+                end
+            else system
+                alt snipReplay recognizes boundary
+                    QE->>QE: Optionally replace mutableMessages&#59; consume boundary
+                else ordinary system event
+                    QE->>QE: Append to mutableMessages
+                    opt compact_boundary
+                        QE->>QE: Trim both in-memory arrays to boundary
+                        QE-->>Caller: yield SDK compact_boundary
+                    end
+                    opt api_error
+                        QE-->>Caller: yield SDK api_retry
+                    end
+                end
+            else tool_use_summary
+                QE-->>Caller: yield SDK tool_use_summary
+            else tombstone or stream_request_start
+                Note over QE: No SDK event is emitted
+            end
+
+            alt maxBudgetUsd reached
+                QE-->>Caller: yield result(error_max_budget_usd)
+                QE-->>Caller: return
+            else Structured-output retry limit reached on a user event
+                QE-->>Caller: yield result(error_max_structured_output_retries)
+                QE-->>Caller: return
+            end
+        end
+
+        QE->>QE: Select last assistant/user result and snapshot diagnostics
+        opt Eager-flush or Cowork mode
+            QE->>Store: flushSessionStorage()
+        end
+        alt Result shape is invalid
+            QE-->>Caller: yield result(error_during_execution, turn-scoped errors)
+        else Result is valid
+            QE->>QE: Extract final non-synthetic text and API-error flag
+            QE-->>Caller: yield result(success, usage, stop_reason, structured_output)
+        end
+        QE-->>Caller: return
+    end
 ```
 
-The `progress` branch consumes live status generated during tool execution,
-rather than model-authored conversation content. QueryEngine retains the event
-in `mutableMessages` and invokes the transcript write path so its deduplication
-walk preserves ordering, but session storage excludes progress itself from the
-durable transcript and `parentUuid` chain. QueryEngine then normalizes supported
-progress kinds for SDK callers. See
-[Query Loop Design: Progress messages](./query-loop.md#progress-messages) for
-the creation and emission path from `tool.call(..., onProgress)` through
-`query()`.
+### 1. Enter the turn and assemble context (`QueryEngine.ts:213-333`)
 
-The `stream_event` branch similarly consumes transport-level events that
-originate in the Anthropic API layer. QueryEngine always uses selected events
-for response usage and `stop_reason` accounting, and only re-emits them to SDK
-callers when `includePartialMessages` is enabled. See
-[Query Loop Design: API stream events](./query-loop.md#api-stream-events) for
-the raw-event and assembled-assistant-message paths.
+The initial destructure snapshots configuration references and defaults. The
+method clears only `discoveredSkillNames`, sets the process working directory,
+records whether session persistence is enabled, and starts the duration clock.
 
-### Queued Commands
+`wrappedCanUseTool()` delegates to the injected authorization callback. Every
+result other than `allow` appends an SDK-compatible denial record containing
+the canonical tool name, tool-use ID, and submitted input. It does not alter
+the authorization decision.
+
+The initial model comes from a user-specified model when present, otherwise
+from global model selection. Thinking defaults to adaptive unless explicitly
+configured or disabled by the default-thinking gate. `fetchSystemPromptParts()`
+then loads the default prompt, base user context, and system context using the
+initial app-state permission directories. Coordinator context is merged into
+the user context.
+
+System-prompt assembly has three ordered layers:
+
+1. caller custom prompt, or the default prompt when no custom prompt exists;
+2. memory mechanics, only when a custom prompt and memory-path override both
+   exist;
+3. caller `appendSystemPrompt` text.
+
+When both `jsonSchema` and the synthetic structured-output tool are available,
+the method registers enforcement before processing the prompt.
+
+### 2. Build the mutable input context (`QueryEngine.ts:335-408`)
+
+The first `ProcessUserInputContext` is intentionally writable. Its
+`setMessages(fn)` replaces `this.mutableMessages`, allowing local slash commands
+such as force-snip to rewrite the engine store before the current prompt is
+appended. It also carries the engine abort controller, cumulative read-file
+state, memory and skill tracking sets, app-state accessors, and no-op UI
+callbacks suitable for headless execution.
+
+An injected orphaned permission is handled at most once per `QueryEngine`
+instance. `hasHandledOrphanedPermission` flips before iterating the recovery
+generator, preventing a later `submitMessage()` call from replaying the same
+decision. Recovery SDK messages are yielded before the new prompt is processed.
+
+### 3. Process, append, and make the input resumable (`QueryEngine.ts:410-486`)
+
+`processUserInput()` parses the prompt as SDK input, expands attachments and
+commands, and returns five values that control the rest of the method:
+
+| Return value | Consumer |
+| --- | --- |
+| `messages` | Appended to `mutableMessages`, then copied into turn-local `messages`. |
+| `shouldQuery` | Selects local-command early return versus `query()`. |
+| `allowedTools` | Replaces `toolPermissionContext.alwaysAllowRules.command`. |
+| `model` | Overrides the initial model for this turn. |
+| `resultText` | Becomes the local-command success result when no query runs. |
+
+Input transcript persistence occurs before model execution. In ordinary
+headless mode, `recordTranscript(messages)` is awaited so a process killed
+before the first API response can still resume from the accepted user prompt.
+Eager-flush and Cowork modes additionally wait for the buffered storage queue.
+Bare mode starts the same write but does not block query startup.
+
+Replay acknowledgements exclude meta caveats, tool results, task-originated
+messages, and other non-selectable input. They are not yielded immediately;
+the model path waits until the first transcript-bearing query event proves that
+the turn has advanced.
+
+### 4. Rebuild execution context and emit init (`QueryEngine.ts:488-555`)
+
+The post-command model is `modelFromUserInput ?? initialMainLoopModel`. A second
+`ProcessUserInputContext` captures this model and the updated `messages`
+snapshot. Its `setMessages` becomes a no-op because prompt/slash-command
+mutation is finished; file-history and attribution updaters are reused from the
+first context.
+
+Skill definitions and enabled-plugin metadata load concurrently. Plugin loading
+is cache-only so SDK/CCR startup does not perform a network install. The method
+then yields `buildSystemInitMessage(...)` before deciding whether a model query
+is required. Consequently, even a local slash command produces the standard SDK
+initialization event first.
+
+### 5. Local-command terminal path (`QueryEngine.ts:556-639`)
+
+When `shouldQuery` is false, no `query()` generator is created. The method scans
+the messages returned by `processUserInput()` and translates only supported
+local results:
+
+- user records containing local stdout/stderr, plus compact summaries, become
+  `SDKUserMessageReplay` events with ANSI escapes removed;
+- `system/local_command` stdout/stderr becomes a synthetic SDK assistant event
+  so remote/mobile clients render assistant-style output;
+- compact boundaries become SDK compact-boundary system events.
+
+The complete local array is then recorded again to catch command-produced
+messages, optionally flushed, and followed by `result/success`. Its
+`stop_reason` is `null`, usage remains the engine accumulator, and `num_turns`
+uses `messages.length - 1`. The generator returns immediately afterward.
+
+### 6. Prepare the model path (`QueryEngine.ts:641-686`)
+
+Selectable input messages start fire-and-forget file-history snapshots when
+both file history and session persistence are enabled. Snapshot completion is
+not a gate for the model request.
+
+The method initializes response-local accounting:
+
+| Value | Initial meaning |
+| --- | --- |
+| `currentMessageUsage = EMPTY_USAGE` | Usage for the current Anthropic response; reset again on every `message_start`. |
+| `turnCount = 1` | SDK-visible agentic turn count; incremented for each yielded internal user message. |
+| `hasAcknowledgedInitialMessages = false` | One-shot replay gate. |
+| `structuredOutputFromTool = undefined` | Last structured-output attachment payload. |
+| `lastStopReason = null` | Updated by synthetic assistant messages or raw `message_delta`. |
+| `errorLogWatermark` | Reference marking the beginning of errors attributable to this submission. |
+| `initialStructuredOutputCalls` | Baseline used to count schema retries introduced by this call only. |
+
+`query()` receives the local message snapshot, assembled contexts, wrapped
+permission callback, rebuilt tool context, fallback model, source `sdk`, and
+turn/task limits. QueryEngine does not inspect `query()`'s returned `Terminal`;
+its `for await` loop consumes yielded events, and completion is detected when
+that generator ends.
+
+### 7. Pre-dispatch persistence and replay gate (`QueryEngine.ts:687-755`)
+
+Assistant messages, user messages, and full compact boundaries enter a common
+pre-dispatch block before type-specific handling.
+
+For a compact boundary with a `preservedSegment.tailUuid`, QueryEngine first
+locates that UUID in `mutableMessages` and records the prefix through the tail.
+The ordering is required because storage cannot relink a preserved segment to a
+tail that was never written.
+
+The current event is then appended to turn-local `messages`. User and compact
+boundary writes are awaited. Assistant writes are fire-and-forget so
+`submitMessage()` immediately requests the next `query()` event. The API layer
+yields an assistant fragment at `content_block_stop`, then later processes
+`message_delta`, which mutates the final fragment's usage and `stop_reason`.
+Awaiting the lazy transcript write here would hold generator backpressure until
+the storage drain completed and prevent the delta from being consumed first.
+
+```text
+content_block_stop
+  -> QueryEngine receives AssistantMessage with provisional usage/stop_reason
+  -> start recordTranscript(messages), do not await
+  -> request next query() event
+message_delta
+  -> API layer mutates the last yielded assistant object
+  -> QueryEngine independently updates currentMessageUsage and lastStopReason
+storage drain
+  -> serializes the queued assistant reference
+```
+
+The per-file storage queue preserves write order, but the final assistant
+metadata still has a temporal coupling: persistence expects the direct object
+mutation to occur before lazy serialization. QueryEngine's SDK result metadata
+does not depend on that timing because the `stream_event` branch separately
+reads the raw `message_delta`.
+
+After the first transcript-bearing query event, selectable initial user
+messages are replayed once when `replayUserMessages` is enabled. Finally, every
+internal user event increments `turnCount` before type-specific dispatch.
+
+### 8. Dispatch each query event (`QueryEngine.ts:757-969`)
+
+The switch translates the internal `query()` protocol into engine state,
+transcript work, and public SDK events. The common persistence block described
+above has already handled assistant, user, and compact-boundary events before
+this dispatch runs.
+
+| Internal event | Engine-state effect | Persistence effect | SDK-visible effect |
+| --- | --- | --- | --- |
+| `tombstone` | None; it is only a removal control signal for the query loop. | None in this branch. | Suppressed. |
+| `assistant` | Capture a non-null synthetic `stop_reason`; append to `mutableMessages`. | Already started by the common block. | Yield normalized assistant block(s). |
+| `progress` | Append to `mutableMessages` and turn-local `messages`. | Start `recordTranscript()` so the next submission's dedup walk sees it; progress does not become a parent-chain participant or resumable transcript message. | Yield supported normalized progress. |
+| `user` | Append to `mutableMessages`; `turnCount` was incremented before the switch. | Already awaited by the common block. | Yield normalized user/tool-result event(s). |
+| `stream_event` | Maintain usage for the current API response and capture `stop_reason`. | None. | Yield the raw stream event only when `includePartialMessages` is enabled. |
+| `attachment` | Append to both arrays; capture structured output, enforce max turns, or replay a queued command. | Start `recordTranscript()` for dedup bookkeeping. | Normally suppressed; selected attachment subtypes produce a replay or terminal result. |
+| `stream_request_start` | None. | None. | Suppressed. |
+| `system` | Give `snipReplay` first refusal; otherwise append the event and apply compact-boundary trimming. | Full compact boundaries were handled by the common block. | Yield only compact-boundary and API-retry events. |
+| `tool_use_summary` | None. | None. | Yield a summary with its preceding tool-use IDs. |
+
+#### Stream accounting
+
+`currentMessageUsage` describes one Anthropic response, while
+`this.totalUsage` accumulates completed responses across the engine session.
+`message_start` resets the current value and incorporates initial/cache usage;
+`message_delta` adds output usage and captures its terminal `stop_reason`; and
+`message_stop` folds the completed current value into `this.totalUsage`.
+
+This is independent of whether raw partial events are exposed to the caller.
+The accounting branch always consumes them; `includePartialMessages` controls
+only the additional SDK `stream_event` yield.
+
+#### Compact and snip controls
+
+`snipReplay` receives every internal system message before ordinary system
+handling. A defined callback result consumes the boundary. When it reports an
+executed snip, QueryEngine replaces all of `mutableMessages` with the replayed
+store; when it reports no execution, the signal is still not appended.
+
+A full `compact_boundary` follows the ordinary system path. After appending the
+boundary, QueryEngine removes all earlier entries from both `mutableMessages`
+and turn-local `messages`, leaving the boundary at index zero. It then yields
+the SDK compact-boundary event. This aligns subsequent engine memory with the
+post-compaction working set already selected inside `query()`.
+
+#### Maximum-turn terminal
+
+`query()` reports the maximum-turn limit as an
+`attachment/max_turns_reached`. QueryEngine optionally flushes persistent
+storage, yields `result/error_max_turns` using the attachment's authoritative
+turn count and limit, and returns immediately. No later per-event guard or
+normal final-result classification runs.
+
+### 9. Apply per-event terminal guards (`QueryEngine.ts:971-1049`)
+
+After every nonterminal switch branch, QueryEngine applies two submission-wide
+limits in fixed order:
+
+1. If cumulative session cost has reached `maxBudgetUsd`, optionally flush
+   storage, yield `result/error_max_budget_usd`, and return.
+2. On an internal user event only, compare the structured-output call counter
+   with its value at submission start. If the delta reaches
+   `maxStructuredOutputRetries` (environment default: five), yield
+   `result/error_max_structured_output_retries` and return.
+
+Because these checks are outside the switch, the triggering internal event can
+first update engine state, start persistence, and yield its normalized SDK
+event. The terminal `result` follows when the caller next advances the
+generator.
+
+### 10. Classify and emit the final result (`QueryEngine.ts:1051-1155`)
+
+Normal exhaustion of `query()` selects the last assistant or user message and
+snapshots errors logged since this submission's watermark. Eager-flush and
+Cowork modes wait for storage before result classification.
+
+A final shape is accepted when it is any of the following:
+
+- an assistant message whose last block is text, thinking, or redacted thinking;
+- a user message whose content consists entirely of tool results;
+- an otherwise non-passing final assistant/user shape when the captured
+  `stop_reason` is `end_turn`, covering a response with no assistant content.
+
+Anything else yields `result/error_during_execution` with only the
+turn-attributable diagnostics. On success, QueryEngine extracts text only from
+the final non-synthetic assistant message, detects API-error tool results,
+attaches any structured-output payload, and yields `result/success` with the
+engine's cumulative usage, cost, permission denials, captured stop reason, and
+this submission's `turnCount`. The method then returns.
+
+### Queued commands
 
 `queued_command` has two different paths, depending on whether the queue is
 drained outside QueryEngine or inside an already-running `query()` loop.

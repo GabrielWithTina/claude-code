@@ -119,6 +119,269 @@ Sidecars hold data that should not live inline in the main transcript:
 
 ---
 
+## Session Entry Production and Write Paths
+
+Session storage is a sink, not the source of conversation events. User input,
+the Anthropic stream, tool execution, hooks, attachment collectors, lifecycle
+timers, and domain-specific state managers first create runtime `Message` or
+metadata objects. Interactive, headless, and subagent coordinators then route
+those objects into the shared storage implementation.
+
+```mermaid
+flowchart TD
+    Input["User input / local commands"] --> Constructors["Message constructors"]
+    Model["Anthropic response stream"] --> Constructors
+    Tools["Tool, hook, and attachment runtime"] --> Constructors
+    Lifecycle["Compaction and lifecycle events"] --> Constructors
+
+    Constructors --> Repl["Interactive REPL\nsetMessages"]
+    Constructors --> Headless["QueryEngine.submitMessage"]
+    Constructors --> Agent["Subagent query loop"]
+
+    Repl --> ReplObserver["useLogMessages"]
+    ReplObserver --> Record["recordTranscript"]
+    Headless --> Record
+    Agent --> Sidechain["recordSidechainTranscript"]
+
+    Domain["Queue, file history, titles,\nmode, worktree, attribution"] --> Direct["Domain-specific record/save function"]
+
+    Record --> Project["Project.insertMessageChain / appendEntry"]
+    Sidechain --> Project
+    Direct --> Project
+    Direct --> SyncWriter["appendEntryToFile"]
+    Project --> Queue["Per-file ordered write queue"]
+    Queue --> Jsonl["JSON.stringify + append JSONL"]
+    SyncWriter --> Jsonl
+```
+
+### Interactive REPL: State-Observed Persistence
+
+The interactive path does not ask each producer to write its own transcript
+row. Producers append runtime messages to the REPL's React `messages` state.
+`useLogMessages()` observes that array and passes either its newly appended tail
+or a rebuilt full array to `recordTranscript()`:
+
+```text
+producer
+  -> createUserMessage / createAttachmentMessage / other constructor
+  -> setMessages(...)
+  -> useLogMessages(messages)
+  -> recordTranscript(new tail)
+```
+
+`useLogMessages()` is fire-and-forget so filesystem latency does not block the
+terminal UI. It tracks the last recorded length and parent UUID to preserve
+chain continuity across incremental renders, shrink operations, and compaction.
+On an untouched resumed conversation, the REPL passes `ignore: true` so merely
+opening and quitting the session does not rewrite its initial messages.
+
+The main producer paths are:
+
+| Persisted message | Source driver | Runtime production path |
+| ----------------- | ------------- | ----------------------- |
+| Human `user` | Keyboard, bridge, or queued prompt | `handlePromptSubmit()` -> `processUserInput()` -> `processTextPrompt()` -> `createUserMessage()` |
+| Synthetic `user` | Local command, hook, reminder, or other Claude Code context | Feature-specific producer -> `createUserMessage({ isMeta: true })` |
+| Tool-result `user` | An assistant `tool_use` block | `query()` -> tool executor -> tool implementation -> `createUserMessage({ tool_result, toolUseResult, sourceToolAssistantUUID })` |
+| `assistant` | Anthropic response stream | API stream `content_block_stop` -> `AssistantMessage` -> `query()` yield |
+| `attachment` | Input and inter-turn context collection | `getAttachments()` -> `getAttachmentMessages()` -> `createAttachmentMessage()` |
+| `system:local_command` | Slash-command or bash-mode processing | local command result -> `createCommandInputMessage()` |
+| `system:turn_duration` | REPL turn completion | duration/count calculation -> `createTurnDurationMessage()` |
+| `system:away_summary` | Away-summary hook | summary result -> `createAwaySummaryMessage()` |
+| `system:compact_boundary` | Manual or automatic compaction | compact service -> `createCompactBoundaryMessage()` |
+
+`handlePromptSubmit()` is the main interactive input dispatcher. It calls
+`processUserInput()` for each accepted queued command, collects the returned
+messages, and the REPL appends them before entering `query()`. Streamed query
+events return through `onQueryEvent`; `handleMessageFromStream()` converts or
+forwards them, and the callback appends each resulting message to the same
+React state.
+
+### Model and Tool-Result Production
+
+Assistant transcript entries originate at the API stream boundary. On every
+completed `content_block_stop`, `services/api/claude.ts` creates an
+`AssistantMessage` with a new outer transcript UUID and yields it. A response
+with multiple completed content blocks can therefore produce multiple outer
+assistant records that share the same nested Anthropic `message.id`.
+
+When a completed assistant block is a `tool_use`, the query loop dispatches it
+through streaming or batch tool execution. Permission resolution, hooks, and
+the tool implementation produce a result that is projected into a user-role
+message:
+
+```text
+Anthropic assistant tool_use
+  -> query tool dispatch
+  -> permission and hook processing
+  -> tool.call()
+  -> createUserMessage({
+       content: [{ type: "tool_result", tool_use_id: ... }],
+       toolUseResult: ...,
+       sourceToolAssistantUUID: assistant.uuid
+     })
+  -> query yield
+  -> coordinator persistence
+```
+
+The model's `tool_use` is therefore the event that drives the later tool-result
+entry, while the tool implementation supplies its payload. At storage time,
+`sourceToolAssistantUUID` can override the sequential parent so the result
+attaches directly to the assistant record that requested it.
+
+### Attachment Production
+
+Attachments are collected at two main points:
+
+1. `processUserInput()` calls `getAttachmentMessages()` while accepting a new
+   prompt. This produces input-scoped context such as `@`-mentioned files, IDE
+   selections, memories, and initial skill or agent information.
+2. After a model/tool iteration, `query()` calls `getAttachmentMessages()`
+   again. This produces inter-turn context such as queued task notifications,
+   changed files, reminders, and registry deltas.
+
+For example, skill and agent listings follow this path:
+
+```text
+runtime skill/agent registry
+  -> getSkillListingAttachments() / getAgentListingDeltaAttachment()
+  -> getAttachments()
+  -> getAttachmentMessages()
+  -> createAttachmentMessage()
+  -> REPL or QueryEngine persistence path
+```
+
+These attachment records are generated by Claude Code's runtime registries;
+they are not returned by the Anthropic server. Their later conversion to
+model-visible user-role context is a separate API-normalization operation.
+
+### Headless and SDK: Explicit Persistence
+
+`QueryEngine.submitMessage()` owns the headless/SDK message arrays and calls
+storage explicitly rather than relying on a React observer. After
+`processUserInput()` returns, it appends the accepted input to
+`mutableMessages` and records it before entering `query()`. This early write
+makes a session resumable even if the process stops before the API returns.
+Normal headless sessions await that initial write; bare mode starts it without
+awaiting.
+
+As `query()` yields later events, `QueryEngine` applies event-specific policy:
+
+| Yielded event | State and persistence handling |
+| ------------- | ------------------------------ |
+| `assistant` | Add to turn and long-lived arrays; start `recordTranscript()` without awaiting because a later `message_delta` mutates final usage and `stop_reason`. |
+| `user` | Add to both arrays and await `recordTranscript()`; this normally represents a tool result during the loop. |
+| `system:compact_boundary` | First persist the required preserved-segment tail, then add and await the boundary write. |
+| `attachment` | Add to both arrays and start `recordTranscript()` in its switch branch. |
+| `progress` | Add to both arrays and invoke `recordTranscript()` for bookkeeping, but the current `isLoggableMessage()` filter removes progress before disk persistence. |
+| `stream_event` | Update streaming usage/stop state and optionally emit an SDK event; do not create an ordinary transcript row. |
+| `tombstone` | Treat as a control signal; do not append it. Interactive handling may remove the referenced previously written row. |
+| `tool_use_summary` and request events | Expose adjacent SDK/query protocol information; do not persist as ordinary conversation messages. |
+
+The fire-and-forget assistant policy depends on the per-file write queue's
+ordered, delayed serialization: `message_delta` can update the already-yielded
+assistant object before the queued entry is stringified. The detailed
+headless event loop and its ordering constraints are documented in
+[Query Engine](./query-engine.md).
+
+### Subagent Persistence
+
+Subagents write sidechain files directly rather than entering the main REPL or
+`QueryEngine` pipeline:
+
+```text
+runAgent / forkedAgent / LocalMainSessionTask
+  -> construct inherited context and agent prompt
+  -> recordSidechainTranscript(initialMessages, agentId)
+  -> query()
+  -> recordSidechainTranscript([recordable event], agentId, lastRecordedUuid)
+  -> subagents/agent-<agentId>.jsonl
+```
+
+`recordSidechainTranscript()` calls the same `insertMessageChain()` writer with
+`isSidechain: true`, the agent id, and an explicit starting parent. Agent launch
+also writes a separate `.meta.json` sidecar containing routing information such
+as agent type, task description, and optional worktree path.
+
+### Metadata and Snapshot Producers
+
+Entries without `parentUuid` are normally emitted by domain-specific state
+owners. They bypass the conversation-message constructors and call a dedicated
+record/save function, `Project.appendEntry()`, or the direct synchronous
+`appendEntryToFile()` helper.
+
+| Entry family | Source driver and route |
+| ------------ | ----------------------- |
+| `queue-operation` | `messageQueueManager.enqueue()`, `dequeue()`, and removal operations -> `recordQueueOperation()` -> `insertQueueOperation()` |
+| `file-history-snapshot` | Prompt boundary or file-history-aware mutation -> `fileHistoryMakeSnapshot()` / `fileHistoryTrackEdit()` -> `recordFileHistorySnapshot()` |
+| `attribution-snapshot` | REPL or headless attribution-state update -> `recordAttributionSnapshot()` |
+| `content-replacement` | Query/resume tool-result budget enforcement -> `recordContentReplacement()`; an `agentId` routes it to a sidechain file |
+| `custom-title`, `ai-title`, `task-summary`, `tag` | Rename, generated-title, status-summary, and tag features -> corresponding `save*()` function -> direct file append |
+| `agent-name`, `agent-color`, `agent-setting` | Agent configuration -> corresponding save/cache function; cached startup settings are materialized with the first conversation message |
+| `pr-link` | PR-linking feature -> `linkSessionToPR()` -> direct file append |
+| `mode` | Normal/coordinator initialization or transition -> `saveMode()` cache -> materialization or cleanup re-append |
+| `worktree-state` | Worktree startup, enter, exit, or resume -> `saveWorktreeState()`; write immediately if the session file already exists |
+| `speculation-accept` | Accepted prompt speculation -> direct JSONL append in `services/PromptSuggestion/speculation.ts` |
+| `marble-origami-commit`, `marble-origami-snapshot` | Context-collapse state changes -> corresponding `recordContextCollapse*()` function -> `appendEntry()` |
+
+`summary` remains part of the recovered `Entry` union and loader, but no active
+writer for it was located in this checkout. It should not be confused with a
+`system:compact_boundary` plus its compact-summary user message.
+
+### Shared Transcript Writer
+
+For ordinary main or sidechain messages, the final path is:
+
+```text
+recordTranscript() / recordSidechainTranscript()
+  -> cleanMessagesForLogging()
+  -> UUID deduplication
+  -> Project.insertMessageChain()
+       assign parentUuid
+       override tool-result parent when sourceToolAssistantUUID exists
+       add sessionId, cwd, userType, entrypoint, version, branch, and slug
+  -> Project.appendEntry()
+       choose main or subagent file
+       perform final UUID deduplication
+       optionally mirror main TranscriptMessage to remote persistence
+  -> enqueueWrite()
+  -> delayed per-file drain
+  -> JSON.stringify(entry) + newline
+  -> append to JSONL
+```
+
+`Project` owns one ordered queue per output file. A drain is normally scheduled
+for 100 ms later, batches queued entries, and appends them in insertion order.
+`flushSessionStorage()` and process cleanup force pending work to finish. The
+session file pointer is normally materialized by the first user or assistant
+message; earlier entries routed through `Project.appendEntry()` are buffered.
+Some metadata APIs use `appendEntryToFile()` directly and therefore do not pass
+through this delayed queue.
+
+Before the chain writer, `cleanMessagesForLogging()` applies the current
+runtime's persistence policy. It always drops progress. For external users, the
+current recovered source also drops most attachments, except gated hook
+additional context, and removes internal REPL wrapper tool pairs. This differs
+from the primary 2.1.235 sample, which persists many external attachment rows;
+that is evidence of sampled-binary versus recovered-source drift, not evidence
+that the sample rows came through a different parent-chain writer.
+
+### Source-Unverified Sample Producers
+
+The primary sample contains entry families for which this checkout has no
+matching active writer or, in some cases, no matching recovered type. Their
+payloads and ordering can be analyzed from JSONL, but their exact production
+path cannot be asserted from this source snapshot:
+
+| Sample entry | Source status |
+| ------------ | ------------- |
+| `relocated` | No matching writer or loader located. |
+| `permission-mode` | Observed on disk but absent from the recovered `Entry` union. |
+| `atis-latch` | No matching type or handler located. |
+| `file-history-delta` | Sampled-build delta form; current source writes `file-history-snapshot`, including update snapshots. |
+| `attachment:total_tokens_reminder` | Observed attachment subtype without a matching current attachment-normalization case. |
+
+---
+
 ## Path Layout
 
 Session project directories are rooted at:
@@ -372,6 +635,43 @@ or:
 | `sourceToolAssistantUUID` | UUID of the assistant message containing the matching `tool_use`; used for tool-result parent linkage.                 |
 | `sourceToolUseID`         | Tool-use id that produced the user/tool-result message. Observed in sample for some tool results.                      |
 | `toolUseResult`           | Full structured tool output object retained for SDK/UI/replay. The LLM usually sees only `message.content` projection. |
+
+### `isMeta` Semantics
+
+For a `user` transcript entry, `isMeta: true` distinguishes synthetic context
+created by Claude Code from text entered by the human. Examples include local
+command caveats, skill and agent-listing updates, and other
+`<system-reminder>` context. These records use the Anthropic `user` role so
+their content can participate in the conversation, but normal transcript UI,
+prompt selection, and first-prompt/session-summary logic generally hide or
+skip them. They remain model-visible unless another normalization rule removes
+the message, and `isMeta` itself is stripped from the Anthropic API payload as
+local metadata.
+
+The field does not classify every machine-produced `user` entry. In particular,
+a tool result is identified by a `tool_result` content block and the local
+`toolUseResult` field, whether or not `isMeta` is present. The runtime's
+real-user-message predicate therefore checks all three conditions:
+
+```ts
+message.type === "user" && !message.isMeta && !message.toolUseResult
+```
+
+The three common persisted shapes should be read as follows:
+
+| User-entry shape | Interpretation |
+| ---------------- | -------------- |
+| `"isMeta": true` | Synthetic user-role context generated by Claude Code. |
+| no `isMeta`, no `toolUseResult` | Ordinary human input in the usual case. |
+| `tool_result` content and/or `toolUseResult` | Tool output; classified separately from `isMeta`. |
+
+`isMeta` is optional. `createUserMessage()` accepts `isMeta?: true`, and the
+text-input path converts a false value to `undefined`; JSON serialization then
+omits that property. Some specialized system-event constructors explicitly set
+`isMeta: false`, so those entries retain the false value in JSON. Most
+truthiness-based consumers treat explicit `false` and an absent field alike,
+although system-event rendering and API filtering are also controlled by the
+system subtype.
 
 ### Tool Result Fields
 
@@ -917,15 +1217,15 @@ and are not conversation graph nodes.
 
 For the primary sample, the parent graph is a tree per transcript file:
 
-| Scope                          | Observed result                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------ |
+| Scope                          | Observed result                                              |
+| ------------------------------ | ------------------------------------------------------------ |
 | Main transcript                | 554 UUID-bearing nodes, 1 root, 13 leaves, no missing parents, cycles, duplicate UUIDs, or unreachable nodes. |
-| Main root                      | Line 5, `attachment:hook_success`, UUID `1e8396d1…`.                                      |
-| Main fan-out                   | 12 parent nodes have more than one child; maximum child count is 2.                       |
-| Main row adjacency             | 14 parent links do not point to the immediately previous UUID-bearing JSONL row.           |
-| Subagent transcripts           | 22 JSONL files, each with 1 root and no missing parents.                                   |
-| Subagent fan-out               | 11 of 22 subagent files have at least one parent with more than one child.                  |
-| Whole inspected transcript set | Main tree plus 22 subagent trees, which forms a forest across files.                       |
+| Main root                      | Line 5, `attachment:hook_success`, UUID `1e8396d1…`.         |
+| Main fan-out                   | 12 parent nodes have more than one child; maximum child count is 2.<br />- tool_use block in parrallel<br />- AskUserQuestion tool use block and associated Pre-hook.<br /><br />**Root Cause:**<br />When building the UserMessage for tool result, it contains a `sourceToolAssistantUUID` which then replace the default parentUUID when doing the persistence. See `utils/sessionStorage.ts line 1030 ~ 1037`<br />**Samples**:<br />Parent UUID                           <br/>58340c8a-1c25-47bd-9497-393811c05ecc <br/>67c1b80c-230e-45b0-87e4-56ae5253dbea <br/>35bdbe25-6a68-4fd7-a4f0-a7bdcb28b69c <br/>28621471-4f38-4350-8e6d-de083edc2e2f<br/>4f9f4dc9-0708-4938-a7b3-497998100cca |
+| Main row adjacency             | 14 parent links do not point to the immediately previous UUID-bearing JSONL row. |
+| Subagent transcripts           | 22 JSONL files, each with 1 root and no missing parents.     |
+| Subagent fan-out               | 11 of 22 subagent files have at least one parent with more than one child. |
+| Whole inspected transcript set | Main tree plus 22 subagent trees, which forms a forest across files. |
 
 The secondary graph reproduces the structural result at a larger scale: 859
 UUID nodes, 1 root, 13 leaves, 12 fan-out parents, 14 non-adjacent parent links,
