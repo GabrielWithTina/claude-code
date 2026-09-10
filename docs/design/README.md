@@ -147,6 +147,7 @@ sequenceDiagram
 | [repl.md](./repl.md) | `screens/REPL.tsx` — interactive terminal component, query loop, state model, input handling, permissions, hooks |
 | [query-engine.md](./query-engine.md) | `QueryEngine` — session lifecycle, `submitMessage()` pipeline, budget control, SDK message types (headless/SDK path only) |
 | [query-loop.md](./query-loop.md) | `query()` — LLM streaming loop, tool execution, compaction, token budgets, error recovery |
+| [api-claude.md](./api-claude.md) | `services/api/claude.ts` — Messages API request construction, streaming reconstruction, retry/fallback, and wrapper semantics |
 | [query-loop-internals.md](./query-loop-internals.md) | Source-order walkthrough of `queryLoop()` state, context preparation, streaming, recovery, tools, transitions, and terminal exits |
 | [messages.md](./messages.md) | Internal/UI messages, SDK/bridge messages, Anthropic API message payloads, and conversion boundaries |
 | [future-message-layer-poc.md](./future-message-layer-poc.md) | Future POC for a channel-neutral canonical conversation event layer between UI channels, SDK protocol, and LLM API payloads |
