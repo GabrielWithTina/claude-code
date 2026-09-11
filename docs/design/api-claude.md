@@ -215,6 +215,41 @@ completed block is the result they need.
 
 ## Shared `queryModel()` Workflow
 
+### IMHO - IMPORTANT
+
+**The primary goal is to ensure reliable HTTP API communication in an unstable network environment, even when the server is temporarily unavailable or degraded. This reliability enables Claude Code to support long-running tasks that may continue for hours or even days.**
+
+My understanding of the high-level workflow is as follows:
+
+- Normalize messages, including:
+  - Merging user messages
+  - Associating attachments with the appropriate messages
+  - Pairing tool-use requests with their corresponding tool results
+- Repair any missing tool-use and tool-result pairs.
+- Normalize the system-instruction components.
+- Generate the tool schemas.
+- Delegate the SDK API call to the `WithRetry` function, which is responsible for making the HTTP request resilient:
+  - Handle errors such as HTTP `429` and `529` using exponential backoff.
+  - For long-running tasks, wait several minutes between retries when necessary.
+  - Throw an exception if the error remains unresolved after all retry attempts.
+- When `WithRetry` succeeds, return a stream object.
+- Start idle and warning timers to detect whether the stream has stalled.
+- Process each event from the stream:
+  - Yield an assistant message for a valid event.
+  - Throw an exception if an error occurs.
+- After stream processing finishes, raise an exception if it ended because of an idle timeout.
+
+Exception handling works as follows:
+
+- Within the stream-processing loop:
+  - If the user aborts the request, propagate the exception.
+  - For other errors, invoke the non-streaming model-query function as a final recovery attempt when fallback is enabled; otherwise, rethrow the exception.
+- At the top level:
+  - For a user-abort exception, suppress it because the caller handles cancellation separately.
+  - For a `FallbackTrigger` exception, rethrow it so the caller can switch models and retry the operation.
+  - If the error is caused by an unstable streaming endpoint (404), invoke the non-streaming model-query function as a final recovery attempt.
+  - For all other errors, return an assistant API error message.
+
 The private generator owns request preparation, streaming reconstruction,
 fallback, resource cleanup, and request telemetry. The workflow is easiest to
 understand as eleven phases.

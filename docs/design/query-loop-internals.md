@@ -443,10 +443,14 @@ flowchart TD
 
 ### End-to-end sequence
 
-This sequence connects the whole user-turn lifecycle. Internal branches of
-compaction, hooks, result budgeting, and individual tools remain in their
-owning sections; this view emphasizes overlap and the gates between model
-iterations.
+This sequence connects the whole user-turn lifecycle, including assistant-error
+withholding and recovery before normal completion. Compaction algorithms,
+hook internals, result budgeting, and individual tools remain in their owning
+sections. The model participant represents the `deps.callModel()` adapter,
+which can yield synthetic assistant API errors as well as model output; these
+yielded errors do not enter the exception branch. Recovery `break` fragments
+below end the current iteration's sequence and represent a source-level
+`continue` of the outer loop, not termination of the query.
 
 ```mermaid
 sequenceDiagram
@@ -455,7 +459,8 @@ sequenceDiagram
     participant Q as queryLoop
     participant Mem as Memory prefetch
     participant Skill as Skill prefetch
-    participant API as Anthropic API
+    participant API as callModel / Claude API adapter
+    participant Recovery as Context collapse / reactive compact
     participant Exec as StreamingToolExecutor
     participant Pipe as runToolUse / permissions
     participant Tool as Tool.call
@@ -480,7 +485,14 @@ sequenceDiagram
                     Q->>Q: Clear partial assistant/tool accumulators
                     Q->>Exec: Discard old executor and create a fresh one
                 end
-                Q-->>Caller: yield visible stream update
+                alt Recoverable assistant error matches withholding checks
+                    Q->>Q: Withhold prompt-too-long, eligible media-size,<br/>or max_output_tokens error from caller
+                else Ordinary output or non-withheld error
+                    Q-->>Caller: yield visible stream update
+                end
+                opt Event is an AssistantMessage
+                    Q->>Q: Append to assistantMessages, including withheld errors
+                end
 
                 opt Event contains tool_use blocks
                     Q->>Exec: addTool(block, assistantMessage)
@@ -521,10 +533,49 @@ sequenceDiagram
                     Q-->>Caller: return aborted Terminal
 
                 else No tool_use blocks
-                    alt Recovery, stop hook, or budget branch continues
-                        Q->>Q: Replace state and continue
-                    else Normal completion
-                        Q-->>Caller: yield final messages and return completed Terminal
+                    Q->>Q: Inspect last assistant message
+                    alt Prompt-too-long or eligible media-size error with recovery module
+                        opt Prompt-too-long and collapse drain is eligible
+                            Q->>Recovery: recoverFromOverflow(messagesForQuery, querySource)
+                            Recovery-->>Q: Committed collapses and revised messages
+                            break Collapses committed: restart outer iteration
+                                Q->>Q: Replace state with drained messages<br/>transition = collapse_drain_retry, continue
+                            end
+                        end
+                        opt Reactive compact module exists
+                            Q->>Recovery: tryReactiveCompact(..., hasAttempted, aborted)
+                            Recovery-->>Q: Compaction result or no recovery
+                            break Compaction succeeds: restart outer iteration
+                                Q-->>Caller: yield post-compact messages
+                                Q->>Q: Replace state and set reactive guard<br/>transition = reactive_compact_retry, continue
+                            end
+                        end
+                        Q-->>Caller: yield withheld error
+                        Q->>Q: Fire stop-failure hooks without awaiting
+                        Q-->>Caller: return prompt_too_long or image_error
+                    else max_output_tokens assistant error
+                        alt Output-cap escalation is eligible
+                            Q->>Q: Retry same input with 64k override<br/>transition = max_output_tokens_escalate, continue
+                        else Fewer than 3 continuation recoveries used
+                            Q->>Q: Append assistant messages and hidden resume instruction<br/>increment recovery count, transition = max_output_tokens_recovery, continue
+                        else Recovery exhausted
+                            Q-->>Caller: yield withheld max_output_tokens error
+                            Q->>Q: Fire stop-failure hooks without awaiting
+                            Q-->>Caller: return completed (error, not success)
+                        end
+                    else Remaining assistant API error
+                        Note over Q,Caller: Error was already yielded during streaming
+                        Q->>Q: Fire stop-failure hooks without awaiting
+                        Q-->>Caller: return completed (error, not success)
+                    else No terminal API error
+                        Q->>Q: handleStopHooks()
+                        alt Stop hook prevents continuation
+                            Q-->>Caller: return stop_hook_prevented
+                        else Stop hook blocks or token budget requests continuation
+                            Q->>Q: Replace state with messages and hook errors or budget nudge, continue
+                        else Normal completion
+                            Q-->>Caller: return completed Terminal
+                        end
                     end
 
                 else One or more tool_use blocks
@@ -749,16 +800,19 @@ can remain invisible to SDK callers.
 
 Recovery has two levels:
 
-1. When the experimental default-slot cap made the first request 8,000 tokens,
-   and no explicit environment override exists, retry the same history once
-   with `maxOutputTokensOverride = 64_000`.
+1. When the experimental default-slot cap is enabled, no query-loop output
+   override is active, and no explicit environment override exists, retry the
+   same history with `maxOutputTokensOverride = 64_000`. The intended case is
+   escalation from the capped 8,000-token default; the branch checks those
+   configuration gates rather than the actual preceding request limit.
 2. If escalation is unavailable or the larger response is also cut off,
    preserve the partial assistant output, append a hidden “resume directly”
    instruction, and start another model iteration. At most three such
    continuation recoveries are allowed.
 
-The 8k-to-64k escalation is a clean retry and does not consume one of the three
-continuation attempts. When recovery is exhausted, the withheld error is
+Escalation retries the same input and does not consume one of the three
+continuation attempts. A continuation clears the output override and can make
+escalation eligible again. When recovery is exhausted, the withheld error is
 finally surfaced. `model_context_window_exceeded` deliberately enters the same
 continuation path because the response was likewise cut off. See
 `services/api/claude.ts:1590-1594`, `services/api/claude.ts:2266-2290`, and
@@ -1543,7 +1597,28 @@ prompt caching; overwrites such as expanded paths are not serialized outward.
 Prompt-too-long, media-size, and max-output-token assistant errors can be
 withheld from the caller. They are still appended to `assistantMessages`, so
 post-stream code can recover or later yield the exact error. This prevents a
-temporary error from appearing before a successful retry.
+temporary error from appearing before a successful retry. Some SDK consumers
+terminate on an error field, so yielding the error before recovery could leave
+the loop running after its consumer has stopped listening.
+
+The checks are independent; any matching check suppresses the outward yield:
+
+| Error | Withholding check |
+|---|---|
+| Prompt too long | Context-collapse helper when compiled in, or reactive-compaction helper when present. |
+| Media size | `mediaRecoveryEnabled` and the reactive-compaction media-error helper. The gate is captured before streaming and reused during recovery. |
+| Max output tokens | `isWithheldMaxOutputTokens(message)`: assistant type with `apiError === 'max_output_tokens'`. |
+
+Other messages are yielded immediately. Withholding the synthetic error does
+not retract text, thinking, or other output already yielded from that request.
+Every assistant message, visible or withheld, still enters the internal
+accumulator (`query.ts:826-827`).
+
+These are yielded message values, not thrown exceptions. In particular,
+`services/api/claude.ts:2266-2291` converts stream stop reasons `max_tokens`
+and `model_context_window_exceeded` into synthetic assistant API errors tagged
+`max_output_tokens`. A normally finishing iterator can therefore still require
+recovery. Escaped exceptions instead follow section 5.
 
 ### Assistant and tool accumulation (`query.ts:826-862`)
 
@@ -1705,14 +1780,33 @@ tool-use summary. Its generation overlapped the current model stream.
 
 ## 7. No-tool completion and recovery (`query.ts:1062-1358`)
 
-This branch runs when no tool block was observed.
+This branch runs only when `needsFollowUp` is false: no tool block was observed
+in the current response. After post-stream abort handling and the pending
+tool-summary yield, it inspects `assistantMessages.at(-1)`. It does not scan
+every assistant message for errors or apply these recovery branches to the
+tool-follow-up path.
+
+The order is prompt/media recovery, output-token recovery, remaining API-error
+termination, ordinary stop hooks, then token-budget continuation. Successful
+recovery replaces `State` and continues the outer query loop, causing context
+preparation and another model call. This is separate from transport retries
+inside `withRetry()` and model fallback in the inner API loop. These recovery
+transitions preserve `turnCount`.
 
 ### Collapse-drain retry (`query.ts:1065-1117`)
 
-For a withheld 413, context collapse gets first recovery priority. Unless the
-previous transition was already `collapse_drain_retry`, staged collapses are
-committed. A non-empty result becomes a complete new `State` and restarts the
-outer loop.
+For a prompt-too-long assistant API error, context collapse gets first recovery
+priority when its module is available. The local name `isWithheld413` describes
+an assistant-message predicate (`isApiErrorMessage` plus
+`isPromptTooLongMessage`), not a caught HTTP exception or a stored withholding
+flag. Unless the previous transition was already `collapse_drain_retry`, the
+loop calls `recoverFromOverflow()` to commit staged collapses.
+
+When `drained.committed > 0`, the revised messages become a complete new
+`State` with transition `collapse_drain_retry`, and the outer loop restarts
+without surfacing the error. If nothing was committed, or the immediately
+preceding transition was already a drain retry, execution proceeds to reactive
+compaction. Media-size errors skip collapse drain.
 
 ### Reactive compaction (`query.ts:1119-1183`)
 
@@ -1721,28 +1815,51 @@ success, task-budget carryover is updated, post-compact messages are yielded,
 and a state containing only those messages continues with
 `reactive_compact_retry`. The one-shot guard becomes true.
 
-On failure the withheld error is yielded, stop-failure hooks run, and the loop
-returns `prompt_too_long` or `image_error`. Stop hooks are skipped because no
-valid model completion exists and a blocking hook could create a retry cycle.
+The call receives the existing reactive-compaction guard and abort state. If
+it returns no result, the withheld error is yielded, `executeStopFailureHooks()`
+is invoked without awaiting, and the loop returns `prompt_too_long` or
+`image_error`. If reactive compaction is absent but context collapse is compiled
+in, an unrecovered prompt-too-long error has the same surface-and-return path.
+Without either recovery module, prompt-too-long falls through to the remaining
+API-error exit below.
+
+Ordinary `handleStopHooks()` is skipped on these terminal error paths. A
+blocking stop hook could otherwise inject more context and repeatedly retry
+an already oversized prompt.
 
 ### Output-token recovery (`query.ts:1185-1256`)
 
 The withheld max-output error has two recovery levels:
 
-1. An eligible capped request retries the same history with a 64k override via
-   `max_output_tokens_escalate`.
-2. While below the recovery limit, partial assistant output and a hidden resume
-   instruction are appended via `max_output_tokens_recovery`.
+1. When `tengu_otk_slot_v1` is enabled, `maxOutputTokensOverride` is undefined,
+   and `CLAUDE_CODE_MAX_OUTPUT_TOKENS` is unset, retry `messagesForQuery` with
+   `ESCALATED_MAX_TOKENS` (64k) via `max_output_tokens_escalate`. This retry does
+   not append the partial response or a resume instruction. The override
+   prevents another escalation on the immediate retry.
+2. Otherwise, while `maxOutputTokensRecoveryCount < 3`, append the current
+   `assistantMessages` and a meta user instruction to resume the interrupted
+   output. Increment the count and continue via `max_output_tokens_recovery`.
+   This transition clears the output override, so a later capped request can
+   qualify for escalation again; three is the continuation-recovery limit,
+   not a total model-call limit.
 
-If both are exhausted, the withheld error is yielded.
+If escalation is ineligible and the continuation limit is exhausted, yield the
+withheld error and fall through to the remaining API-error exit. Previously
+streamed partial output may already be visible even when the synthetic error
+is withheld.
 
 ### API error, stop hooks, and token budget (`query.ts:1258-1358`)
 
-Remaining API-error messages fire stop-failure hooks and return `completed`.
-Here `completed` means the loop is finished; QueryEngine separately derives
-outward success from the final message and stop reason.
+If `lastMessage.isApiErrorMessage` remains true, invoke stop-failure hooks
+without awaiting and return `completed`. This includes exhausted output-token
+recovery and ordinary API errors such as authentication or rate-limit failures.
+Ordinary non-withheld errors were already yielded while streaming, so this
+branch does not yield them a second time. Here `completed` means the loop is
+finished; QueryEngine separately derives outward success from the final message
+and stop reason.
 
-`handleStopHooks()` can yield messages. A veto returns
+Only after passing this API-error guard does `handleStopHooks()` run. It can
+yield messages. A veto returns
 `stop_hook_prevented`; blocking errors are appended to a new state with
 `stop_hook_blocking`. The reactive-compaction guard is preserved to prevent a
 compact/413/hook retry cycle.
@@ -2172,7 +2289,7 @@ starts the next iteration with this complete replacement.
 |---|---|---|
 | `collapse_drain_retry` | Withheld 413 and staged collapses | Retry with drained granular context. |
 | `reactive_compact_retry` | Full reactive compact succeeds | Retry from post-compact messages; set guard. |
-| `max_output_tokens_escalate` | First eligible capped overflow | Retry same history with 64k override. |
+| `max_output_tokens_escalate` | Eligible output overflow with cap enabled and no output override | Retry same history with 64k override; does not consume a continuation recovery. |
 | `max_output_tokens_recovery` | Output overflow below retry limit | Append partial output and resume nudge. |
 | `stop_hook_blocking` | Stop hook returns blocking errors | Append errors and mark hook active. |
 | `token_budget_continuation` | More useful output budget remains | Append assistant output and budget nudge. |
