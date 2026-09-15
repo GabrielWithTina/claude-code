@@ -82,3 +82,5 @@ pretty-printed JSON through `OutputLine` for non-empty results.
 - `tools/ListMcpResourcesTool/prompt.ts`
 - `services/mcp/client.ts`
 - `services/mcp/useManageMCPConnections.ts`
+
+- [ListMcpResourcesTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

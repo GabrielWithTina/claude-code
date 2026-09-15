@@ -35,3 +35,5 @@ The tool is deferred and enabled only when agent swarms are enabled. Plain text
 messages are treated as read-only. Cross-machine `bridge:` sends require an
 explicit safety-check approval and cannot be bypassed by permission mode.
 
+
+- [SendMessageTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

@@ -89,3 +89,5 @@ through `OutputLine`.
 - `tools/ReadMcpResourceTool/prompt.ts`
 - `services/mcp/client.ts`
 - `utils/mcpOutputStorage.ts`
+
+- [ReadMcpResourceTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

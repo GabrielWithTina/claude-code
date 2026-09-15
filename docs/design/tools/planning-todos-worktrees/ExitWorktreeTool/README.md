@@ -30,3 +30,5 @@ be completed, it fails closed.
 The restore path resets process CWD, app CWD, original CWD, project root, hook
 snapshots, worktree state, and relevant caches.
 
+
+- [ExitWorktreeTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

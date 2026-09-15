@@ -26,3 +26,5 @@ context in app state.
 
 The tool is deferred and only enabled when agent swarms are enabled.
 
+
+- [TeamCreateTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

@@ -142,3 +142,5 @@ response shapes and shows a single "Sent a message to #channel" line.
 - `services/mcp/mcpStringUtils.ts`
 - `utils/mcpValidation.ts`
 - `utils/mcpOutputStorage.ts`
+
+- [MCPTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

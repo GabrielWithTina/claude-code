@@ -22,3 +22,5 @@ No `SleepTool.ts`, schema, permission handler, call implementation, or UI
 renderer exists in this recovered folder. This document therefore records only
 the prompt-level design visible in the current tree.
 
+
+- [SleepTool recovered boundary](./internals.md): verified registry gate, available fragments, missing implementation, and sequence boundary.

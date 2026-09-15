@@ -25,3 +25,5 @@ This tool changes process-level state through `process.chdir()` and updates the
 session's cwd/project-root bookkeeping. Downstream file tools therefore operate
 inside the worktree after the transition.
 
+
+- [EnterWorktreeTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

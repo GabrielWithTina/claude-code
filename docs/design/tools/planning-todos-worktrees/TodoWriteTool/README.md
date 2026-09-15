@@ -26,3 +26,5 @@ When the verification-agent feature gates are enabled, the main thread closes
 three or more todos, and no todo content mentions verification, the result text
 nudges the model to spawn a verification agent.
 
+
+- [TodoWriteTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

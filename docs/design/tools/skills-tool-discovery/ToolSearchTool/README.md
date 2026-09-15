@@ -31,3 +31,5 @@ Matches are returned as `tool_reference` blocks so the model receives complete
 schemas. If no matches are found and MCP servers are still connecting, the
 result names those pending servers.
 
+
+- [ToolSearchTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

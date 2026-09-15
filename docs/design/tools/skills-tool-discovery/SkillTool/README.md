@@ -104,3 +104,5 @@ available tool pool.
 `prompt.ts` formats the available skill list within a small context budget.
 Bundled skills keep full descriptions; non-bundled descriptions may be trimmed
 or reduced to names when the list is too large.
+
+- [SkillTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

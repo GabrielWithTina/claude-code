@@ -29,3 +29,5 @@ The tool is enabled for first-party and Foundry providers, and for supported
 Claude 4 models on Vertex. It is read-only and concurrency-safe. Permission
 handling returns `passthrough` with an allow-rule suggestion.
 
+
+- [WebSearchTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

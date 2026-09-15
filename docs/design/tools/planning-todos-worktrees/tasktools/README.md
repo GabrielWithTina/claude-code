@@ -94,3 +94,15 @@ the resolution context changes. For example, tasks created before a team exists
 go under the session ID; after `TeamCreateTool` sets `leaderTeamName`, later
 task calls use the sanitized team name; after `TeamDeleteTool` clears it, calls
 fall back to the session ID again.
+
+- [TaskCreateTool internals](./task-create-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [TaskGetTool internals](./task-get-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [TaskListTool internals](./task-list-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [TaskUpdateTool internals](./task-update-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [TaskOutputTool internals](./task-output-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [TaskStopTool internals](./task-stop-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

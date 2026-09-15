@@ -97,3 +97,5 @@ flowchart TB
 - **Dedup.** Re-reading an unchanged range returns a tiny `file_unchanged` stub
   instead of resending the content (saves cache-creation tokens), gated by a
   GrowthBook killswitch.
+
+- [FileReadTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

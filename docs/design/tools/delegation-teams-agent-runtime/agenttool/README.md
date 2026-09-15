@@ -9,6 +9,7 @@ memory.
 | File | Covers |
 |---|---|
 | [agent-tool.md](./agent-tool.md) | `AgentTool.tsx` — public tool schema, dispatch decisions, sync/background/worktree/remote paths |
+| [agent-tool-internals.md](./agent-tool-internals.md) | Source-order walkthrough of `AgentTool.tsx`: contracts, selection, permissions, prompts, execution, foreground/background transfer, cleanup, result mapping, and recovered-source limitations |
 | [agent-runner.md](./agent-runner.md) | `runAgent.ts` and `agentToolUtils.ts` — subagent query execution, context construction, tool filtering, lifecycle finalization |
 | [agent-definitions.md](./agent-definitions.md) | `loadAgentsDir.ts`, `builtInAgents.ts`, `prompt.ts`, `built-in/*` — agent loading, precedence, prompts, built-ins |
 | [agent-fork-resume.md](./agent-fork-resume.md) | `forkSubagent.ts`, `resumeAgent.ts` — forked workers and background continuation |

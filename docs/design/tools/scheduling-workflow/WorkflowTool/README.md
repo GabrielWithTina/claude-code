@@ -14,3 +14,5 @@ in this checkout. Only the tool-name constant is present.
 The folder comment says the feature-gated workflow-scripts implementation is
 off in this build. There is no schema, prompt, call implementation, permission
 flow, or UI renderer in the recovered source.
+
+- [WorkflowTool recovered boundary](./internals.md): verified registry gate, available fragments, missing implementation, and sequence boundary.

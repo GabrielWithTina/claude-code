@@ -22,3 +22,5 @@ The recovered source keeps this folder so references can resolve, but no prompt,
 schema, permission flow, UI renderer, or external execution path is implemented
 in this build.
 
+
+- [TungstenTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

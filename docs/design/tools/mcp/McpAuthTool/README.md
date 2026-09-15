@@ -103,3 +103,5 @@ URL that was already shown to the model.
 - `services/mcp/auth.ts`
 - `services/mcp/mcpStringUtils.ts`
 - `services/mcp/useManageMCPConnections.ts`
+
+- [McpAuthTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

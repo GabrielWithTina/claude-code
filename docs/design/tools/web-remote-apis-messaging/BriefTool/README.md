@@ -99,3 +99,5 @@ the structured output for renderers and SDK consumers.
 - `tools/BriefTool/attachments.ts`
 - `tools/BriefTool/upload.ts`
 - `tools/BriefTool/prompt.ts`
+
+- [BriefTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

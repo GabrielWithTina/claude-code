@@ -38,3 +38,9 @@ All three tools are gated by the `AGENT_TRIGGERS` build feature, the runtime
 cron kill switch, and `CLAUDE_CODE_DISABLE_CRON`. Durable persistence has a
 separate runtime kill switch.
 
+
+- [CronCreateTool internals](./cron-create-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [CronDeleteTool internals](./cron-delete-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
+
+- [CronListTool internals](./cron-list-internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

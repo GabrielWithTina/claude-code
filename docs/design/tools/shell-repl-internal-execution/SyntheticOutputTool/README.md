@@ -29,3 +29,5 @@ compilation in workflow-heavy paths.
 `isSyntheticOutputToolEnabled()` returns true only for non-interactive sessions.
 The main tool registry is expected to create this tool only under that gate.
 
+
+- [SyntheticOutputTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

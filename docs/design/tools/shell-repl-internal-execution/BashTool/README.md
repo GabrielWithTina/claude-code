@@ -138,3 +138,5 @@ before execution. Read-only classification is what lets safe commands (`ls`, `gi
   → ask).
 - **`USER_TYPE === 'ant'`** unlocks additional safe env vars and read-only command
   allowlists (e.g. `gh`, cluster tooling) for internal users.
+
+- [BashTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

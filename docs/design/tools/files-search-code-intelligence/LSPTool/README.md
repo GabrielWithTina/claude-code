@@ -106,3 +106,5 @@ available and exposes full formatted content in verbose mode.
 - `tools/LSPTool/formatters.ts`
 - `tools/LSPTool/symbolContext.ts`
 - `tools/LSPTool/UI.tsx`
+
+- [LSPTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

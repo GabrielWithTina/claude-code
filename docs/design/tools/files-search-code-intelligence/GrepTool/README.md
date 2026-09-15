@@ -86,3 +86,5 @@ flowchart LR
 - **Permission-scoped.** Read-permission ignore patterns are injected as
   `--glob !…` so ripgrep itself won't surface disallowed files; UNC paths are
   skipped to avoid credential probes.
+
+- [GrepTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

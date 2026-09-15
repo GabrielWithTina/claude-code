@@ -22,3 +22,5 @@ On success it removes team/task directories, unregisters session cleanup, clears
 teammate colors, clears leader task-list routing, and removes team context and
 queued inbox messages from app state.
 
+
+- [TeamDeleteTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

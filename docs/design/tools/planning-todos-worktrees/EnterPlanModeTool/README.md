@@ -30,3 +30,5 @@ The tool is deferred, read-only, and concurrency-safe. It is disabled for
 channel modes where entering plan mode would trap the model in a mode it cannot
 exit through normal channel flow.
 
+
+- [EnterPlanModeTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

@@ -34,3 +34,5 @@ settings files.
 - Voice settings run a write-time runtime preflight before being accepted.
 - GrowthBook-gated settings are hidden from prompt text when disabled.
 
+
+- [ConfigTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

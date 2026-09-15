@@ -1,5 +1,9 @@
 # Tool Design Documents
 
+## Fine-grained internals and end-to-end sequences
+
+[Coverage index](./internals-index.md) maps all 42 recovered entry files and 15 absent registry references to their respective design documents and diagrams. [Shared invocation lifecycle](./invocation-lifecycle.md) explains the common executor, permission, hook, and result boundaries. Tool-specific internals live beside the existing overview/helper documents in the categories below.
+
 This directory contains subsystem design notes for tool implementations. Tool
 documents are grouped into category subdirectories by operational role.
 

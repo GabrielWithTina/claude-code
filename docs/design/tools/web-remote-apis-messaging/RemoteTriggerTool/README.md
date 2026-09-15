@@ -29,3 +29,5 @@ The tool is deferred, concurrency-safe, and gated by both a GrowthBook feature
 and the `allow_remote_sessions` policy. `list` and `get` are read-only; create,
 update, and run are not.
 
+
+- [RemoteTriggerTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

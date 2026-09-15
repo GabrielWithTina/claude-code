@@ -144,3 +144,5 @@ After execution, the tool:
 - `tools/PowerShellTool/readOnlyValidation.ts`
 - `tools/PowerShellTool/powershellSecurity.ts`
 - `tools/PowerShellTool/gitSafety.ts`
+
+- [PowerShellTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

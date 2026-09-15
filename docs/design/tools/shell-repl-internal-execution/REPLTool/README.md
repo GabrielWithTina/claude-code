@@ -30,3 +30,5 @@ and display-side rendering logic.
 No `REPLTool.ts`, input schema, call implementation, permission flow, or UI
 renderer is present in this folder.
 
+
+- [REPLTool recovered boundary](./internals.md): verified registry gate, available fragments, missing implementation, and sequence boundary.

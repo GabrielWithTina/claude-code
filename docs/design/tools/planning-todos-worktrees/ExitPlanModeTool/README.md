@@ -33,3 +33,5 @@ returns an awaiting-approval result instead of immediately exiting.
 The tool is deferred but not read-only. Non-teammates require plan mode and user
 approval. Teammates follow the team plan-approval protocol.
 
+
+- [ExitPlanModeV2Tool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

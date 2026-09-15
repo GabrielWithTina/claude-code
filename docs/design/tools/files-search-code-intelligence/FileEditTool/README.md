@@ -116,3 +116,5 @@ model can correct course.
 - **Rich side effects.** `call()` also drives LSP diagnostics, VSCode diff view,
   file-history backups, dynamic-skill discovery, and analytics — all fire-and-forget
   outside the atomic read-modify-write window.
+
+- [FileEditTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

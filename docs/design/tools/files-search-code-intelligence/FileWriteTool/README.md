@@ -94,7 +94,7 @@ sequenceDiagram
         Call->>Call: read existing (for diff + staleness) · determine create vs update
         Call->>Disk: writeTextContent (LF, preserve encoding, mkdir parent)
         Disk-->>Call: LSP didChange/didSave · VSCode notify · history backup
-        Call->>Call: create → patch [] ; update → getPatchForDisplay
+        Call->>Call: create → patch [], update → getPatchForDisplay
         Call-->>LLM: {type, filePath, content, structuredPatch, originalFile}
     end
 ```
@@ -121,3 +121,5 @@ staleness gate entirely.
   Linux when overwriting CRLF files.
 - **Heavy reuse, not duplication.** Schema, diff, staleness, and rendering are
   shared with `Edit`; this tool owns the create/overwrite orchestration.
+
+- [FileWriteTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

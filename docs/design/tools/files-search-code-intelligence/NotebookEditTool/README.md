@@ -107,3 +107,5 @@ id and syntax-highlighted source using `HighlightedCode`.
 - `tools/NotebookEditTool/UI.tsx`
 - `tools/NotebookEditTool/prompt.ts`
 - `tools/FileEditTool/FileEditTool.ts`
+
+- [NotebookEditTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

@@ -102,3 +102,5 @@ file-list display.
 
 For open-ended searches needing multiple rounds, both prompts point the model to
 the `Agent` tool instead.
+
+- [GlobTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

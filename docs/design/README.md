@@ -160,6 +160,7 @@ sequenceDiagram
 | [context.md](./context.md) | System-prompt assembly, CLAUDE.md loading, git status, cache boundary |
 | [memory.md](./memory.md) | Memory system: CLAUDE.md instruction memory, auto-memory, team memory, agent memory, session memory, storage and load paths |
 | [tool-system.md](./tool-system.md) | `Tool` interface, `ToolUseContext`, `buildTool()`, registry assembly (`getTools`, `assembleToolPool`) |
+| [tools/README.md](./tools/README.md) | Tool-specific design documents, grouped by subsystem, including AgentTool internals |
 | [permissions.md](./permissions.md) | Permission modes, `ToolPermissionContext`, rule sources, `canUseTool` dispatch, protected files |
 | [coordinator.md](./coordinator.md) | Multi-agent coordinator mode: coordinator vs worker roles, system prompt injection, agent lifecycle |
 | [autodream.md](./autodream.md) | Background memory consolidation: enabled precondition + three gates, dream agent, consolidation lock |

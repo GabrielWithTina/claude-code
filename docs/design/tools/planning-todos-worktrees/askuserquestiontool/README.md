@@ -282,5 +282,6 @@ plan in the UI until `ExitPlanMode` is called.
   its label.
 - The model must not author an "Other" option — the UI always provides one.
 - Use `multiSelect: true` only when choices are not mutually exclusive.
-```
 
+
+- [AskUserQuestionTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.

@@ -34,3 +34,5 @@ Binary responses can be persisted to disk with a MIME-derived extension. The
 result appends the saved path so the assistant can inspect the raw file if the
 summary is insufficient.
 
+
+- [WebFetchTool internals](./internals.md): source-order execution, state and error boundaries, and an end-to-end sequence diagram.
