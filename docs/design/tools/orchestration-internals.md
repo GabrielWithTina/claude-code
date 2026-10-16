@@ -74,6 +74,113 @@ type MessageUpdate = {
 
 Progress is normally visible to the UI/SDK but does not become a next-request user message. A final user `tool_result` does; attachments may also be normalized by the parent query.
 
+## IMHO Overall sequence flow
+
+`addTool`
+
+  - Check whether the tool definition exists.
+    - If missing, record an already-completed error result and return.
+  - Parse the input to determine whether the tool is concurrency-safe.
+    - If parsing or the concurrency check fails, treat it as non-concurrent.
+  - Push a `TrackedTool` object into the tools queue.
+  - Call `processQueue` asynchronously.
+
+`processQueue`
+
+  - Iterate over queued tool items.
+  - If no tool is executing, start the current tool.
+  - If the current tool and all executing tools are concurrency-safe, start the current tool concurrently.
+  - Otherwise, leave the tool queued.
+    - If it is non-concurrent, stop scanning the queue.
+  - Call `executeTool` to start eligible tools.
+    - Await only its setup, not the complete tool execution.
+
+  `executeTool`
+
+  - Mark the tool as executing and update the in-progress and interruptibility state.
+  - Start `collectResults` asynchronously and store its promise.
+    - When the promise settles, call `processQueue` again to start eligible queued tools.
+  - Inside `collectResults`, check whether execution should already be cancelled:
+    - Streaming fallback discarded the execution.
+    - A sibling Bash tool failed.
+    - The parent query was interrupted.
+    - If cancellation applies, record a synthetic error result and mark the tool as completed without invoking it.
+  - Create an associated abort controller as a child of `siblingAbortController`:
+    - Parent cancellation propagates down to this controller.
+    - If it aborts with reason `'sibling_error'`, do not propagate cancellation upward to the parent query controller.
+    - Otherwise, abort the parent query controller if it is still active and the executor has not been discarded. This propagates cancellation to the sibling controller and other child controllers.
+    - Permission-dialog cancellation can trigger this upward propagation; ordinary permission denial does not necessarily abort the query.
+  - Iterate over the `runToolUse` async generator:
+    - On each update, check whether cancellation applies.
+    - If cancellation applies and the current tool has not previously emitted an error result, record a synthetic cancellation result and stop consuming the generator.
+    - If an update contains an error `tool_result` and the current tool is Bash, abort `siblingAbortController` with `'sibling_error'`, allowing the parent agent loop to
+    continue.
+    - Store progress messages separately which can be observed by a result consumer.
+    - Buffer other messages and collect context modifiers.
+  - When collection completes:
+    - Store the buffered results and mark the tool as completed.
+    - Update interruptibility state.
+    - Apply context modifiers for non-concurrent tools.
+    - Leave result delivery to `getCompletedResults` and `getRemainingResults`.
+
+  `runToolUse`
+
+  - Resolve the tool definition, including supported deprecated aliases.
+  - If the tool is missing, yield an error result and return.
+  - If its abort signal is already aborted, yield a cancellation result and return.
+  - Iterate over `streamedCheckPermissionsAndCallTool` and yield each update.
+  - Catch escaped exceptions and yield an error result.
+
+  `streamedCheckPermissionsAndCallTool`
+
+  - Adapt the promise-based execution function and its progress callback into a custom asynchronous iterable.
+  - Create a `Stream` and start `checkPermissionsAndCallTool`.
+  - Enqueue progress messages as the progress callback receives them.
+  - When the execution promise resolves, enqueue its returned result messages.
+  - If the promise rejects, signal the stream error.
+  - Mark the stream as done when the promise settles.
+  - Return the stream for consumption by `runToolUse`.
+
+  `checkPermissionsAndCallTool`
+
+  - Validate the input against the tool’s schema and optional `validateInput` function.
+    - Return an error result if validation fails.
+  - For Bash, start a speculative security classifier check that can overlap subsequent work.
+  - Prepare the input for hooks and permission checks.
+  - Run `runPreToolUseHooks` and process its outputs:
+    - Forward progress and collect hook messages or additional context.
+    - Capture input changes and hook permission decisions.
+    - Capture continuation controls and stop reasons.
+    - Return early if a hook requests an immediate stop.
+  - Call `resolveHookPermissionDecision`:
+    - Reconcile the hook decision with configured permission rules.
+    - Invoke `canUseTool` when required, including any necessary user interaction.
+    - A hook’s allow decision does not override configured deny or ask rules.
+  - If the final permission decision is not allow, return a rejection result without invoking the tool.
+  - Call the underlying `tool.call` with the effective input, execution context, and progress callback.
+  - On success:
+    - Convert tool output into model-facing `tool_result` messages.
+    - Run `runPostToolUseHooks`.
+    - For MCP tools, allow post-hooks to update output before final result mapping.
+    - Include additional tool messages, hook messages, continuation controls, and context modifiers.
+    - Return the consolidated results.
+  - On an exception in the execution block:
+    - Run `runPostToolUseFailureHooks`.
+    - Return an error result and failure-hook messages.
+
+  `getCompletedResults`
+
+  - Called by the query loop during model streaming to collect available updates without waiting.
+  - Yield pending progress and completed tool results, respecting non-concurrent execution boundaries.
+  - Mark delivered tools as yielded and remove their IDs from the in-progress set.
+
+  `getRemainingResults`
+
+  - Used to drain outstanding tool execution after model streaming.
+  - Process the queue and yield available updates through `getCompletedResults`.
+  - If tools are still executing with no available updates, wait for either a tool to settle or new progress to arrive.
+  - Continue until all tool results have been yielded.
+
 ## End-to-end sequence: model tool use to next model turn
 
 The primary execution path is streaming. The diagram expands one known,

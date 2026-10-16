@@ -23,9 +23,9 @@ tools/FileReadTool/
 
 Read a file and return it in the right form for the model: line-numbered text
 (with `offset`/`limit` pagination), a resized image, a PDF (native document block
-or extracted page images), or notebook cells. Every successful text/notebook read
-is recorded in `readFileState` so the editing tools can later detect staleness and
-enforce read-before-write.
+or extracted page images), or notebook cells. **Every successful text/notebook read**
+**is recorded in `readFileState` so the editing tools can later detect staleness and**
+**enforce read-before-write.**
 
 ## Central Role: `readFileState`
 
@@ -87,7 +87,7 @@ flowchart TB
 - **One tool, many content types.** A discriminated-union output (`text` / `image`
   / `pdf` / `parts` / `notebook` / `file_unchanged`) lets a single `Read` handle
   everything, with type detection driving the `call()` branch.
-- **It is the read-before-write gate.** The whole edit-safety model depends on
+- **It is the read-before-write gate.** The whole edit-safety model depends onz
   `Read` having registered the file (full view, current mtime) in `readFileState`.
 - **Token-budget-aware.** Text reads are bounded by a byte cap (cheap pre-check)
   and a token cap (exact, API-counted); images are resized/recompressed to fit the
