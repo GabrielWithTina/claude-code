@@ -2,6 +2,300 @@
 
 Source: [tools/BashTool/BashTool.tsx](../../../../../tools/BashTool/BashTool.tsx). Line ranges refer to this recovered source snapshot; symbols are the stable navigation handles.
 
+## IMHO - Overall Sequence Flow
+
+### `mapToolResultToToolResultBlockParam`
+
+- Structured output (TODO, when cut this?)
+- Image based64
+- Text
+  - Large size result
+  - The error message appends interrupted prompt if any
+  - Background information 
+
+### `call`
+
+- iterate`runShellCommand` generator
+- For progressive results, call `onProgress` callback to render the progresses to the caller (UI)
+- Process the final result
+- Keep only the specified maximum length of  `stdout` to avoid the oversized outcome
+- Inspect and normalize the error code and error message from the the exit code. some of non-zero exit code doesn't mean error.
+- If current agent is the main agent, reset the working directory to the original one in case it has been changed by the bash execution.
+- If the result is huge and has associated output file path, link/copy the file to the dedicated project scope path
+- Non-interrupted error raises the exception.
+- If `stdout` is an image, resize the image with an appropriate size.
+- return
+
+
+### `TaskOutput`
+
+File: `utils/task/TaskOutput.ts`
+
+This description covers the normal Bash file-mode path; hook/pipe-mode behavior is outside its scope.
+
+`TaskOutput` manages captured command output and progress snapshots. **`TaskOutputCapture`** could be a more explicit name. It does not itself own the command’s execution
+status or exit code.
+
+- **Construction:** The constructor receives a task ID, progress callback, capture-mode flag, and optional memory limit. It derives the output-file path from the task ID.
+In Bash file mode, the child writes stdout and stderr directly into that file throughout execution.
+
+- **Shared static fields:**
+  - `#registry`: File-mode instances that have a progress callback.
+  - `#activePolling`: Registered instances currently selected for polling.
+  - `#pollInterval`: The handle for the single shared polling timer.
+
+- **`startPolling(taskId)`:** Looks up the registered instance and adds it to `#activePolling`. If no timer exists, it creates a one-second interval that calls `#tick()`.
+The timer is unreferenced so it cannot alone keep the application running.
+
+- **`#tick()`:** For each active instance with a callback:
+  - Starts an asynchronous `tailFile()` read of at most the last 4,096 bytes, without awaiting it.
+  - When the read completes, rechecks that the callback still exists.
+  - If content is empty, invokes `onProgress` with empty previews. This still wakes the Bash progress loop so it can check lifecycle changes.
+  - Otherwise, scans the sample to extract short and longer previews targeting the last 5 and 100 lines.
+  - Uses the sample’s line count directly when the whole file fits, or estimates the total from sample density when it does not. These are display-oriented counts, with newline-counting edge cases.
+  - Updates stored counters and calls `onProgress` with previews, total lines, file size, and whether earlier bytes were omitted.
+  - Ignores read failures.
+  
+  The previews are snapshots, not a queue of every output change. Because reads are not awaited, successive ticks can overlap.
+  
+- **`stopPolling(taskId)`:** Removes the instance from active polling. If no active instances remain, it clears the shared timer. Reads already in flight are not
+canceled.
+
+- **`getStdout()`:** Reads a bounded **prefix** of the output file, unlike progress polling, which reads its tail. After a successful read, it records file size and sets
+  `#outputFileRedundant`:
+  - `true` when the entire output fits inline.
+  - `false` when additional output remains in the file.
+
+  Downstream shell/tool code uses this information to delete redundant files or preserve larger output and expose its location.
+
+### `ShellCommandImpl`
+
+File: `utils/ShellCommand.ts`
+
+This description covers the normal Bash file-mode path; hook/pipe-mode behavior is outside its scope.
+
+`ShellCommandImpl` **manages an already-spawned shell process: completion, cancellation, timeout, backgrounding, and final result assembly.** `Shell.exec()` launches the
+process first, then `wrapSpawn()` constructs this wrapper.
+
+**Construction:** The constructor receives the child process, abort signal, timeout, `TaskOutput`, optional automatic-backgrounding flag, and optional output-size limit.
+It stores these dependencies and creates the public `result` Promise. Bash stdout and stderr already point to the output file, so no JavaScript stream wrappers are created in this mode.
+
+**Important instance fields:**
+
+- `#status`: Initially `running`; can become `backgrounded`, `completed`, or `killed`.
+- `#backgroundTaskId`: Identifies the task that owns the backgrounded command.
+- `#childProcess`: The process handle supplied by `Shell.exec()`.
+- `taskOutput`: Captures output and supplies progress previews and final output.
+- `#timeoutId`: Handle for the foreground execution timeout.
+- `#sizeWatchdog`: Handle for periodic background-output size checks.
+- `#exitCodeResolver`: Completes the internal Promise carrying the exit-code number.
+- `#resultResolver`: Completes the public `result` Promise carrying the full `ExecResult`.
+- `#boundAbortHandler`: Saved callback reference, allowing the abort listener to be removed later.
+- `#onTimeoutCallback`: Optional callback registered by the caller to handle timeout through backgrounding.
+
+**`#createResultPromise()`:** Installs lifecycle listeners and constructs two connected Promises.
+
+- Registers a one-time abort listener.
+- Registers one-time child-process `exit` and `error` listeners.
+- Starts the foreground timeout.
+- Creates `exitPromise`, saving its resolver in `#exitCodeResolver`.
+- Creates the public result Promise, saving its resolver in `#resultResolver`.
+- Registers `#handleExit` through `exitPromise.then(...)`.
+
+The process event resolves `exitPromise` with a number. `#handleExit(code)` then reads the output, builds `ExecResult`, and resolves the public result Promise.
+
+The implementation listens for `exit`, not `close`, so completion does not wait for descendant processes to close inherited output descriptors.
+
+**`#exitHandler(code, signal)`:** Converts the process exit event into a numeric result and calls `#resolveExitCode()`.
+
+- Uses the supplied exit code when available.
+- If there is no exit code and the signal is `SIGTERM`, maps it to `144`.
+- Otherwise falls back to `1`.
+
+The `144` mapping is the current implementation’s behavior, distinct from its internal timeout code of `143`.
+
+**`#errorHandler()`:** Calls `#resolveExitCode(1)` when the child process emits an error.
+
+**`#resolveExitCode(code)`:** Calls the saved exit-Promise resolver, then clears the reference. Later exit/error/kill paths cannot resolve it again. The first path that
+reaches this method with an available resolver determines the result code.
+
+**`#handleExit(code)`:** Assembles the final command result.
+
+- Clears lifecycle timers and removes the abort listener.
+- Changes `running` or `backgrounded` status to `completed`; preserves `killed`.
+- Awaits `taskOutput.getStdout()`.
+- Builds `ExecResult` with the code, stdout, stderr, interruption flag, and optional background task ID.
+- For foreground output that fits entirely inline, requests deletion of the redundant output file.
+- For larger foreground output, includes the file path, size, and task ID.
+- Keeps background output files for later task consumption.
+- Adds a diagnostic for output-size termination or timeout when applicable.
+- Resolves the public `result` Promise.
+
+`completed` means execution has finished, not necessarily succeeded. A nonzero code can still have this wrapper status; higher layers interpret success or failure.
+
+**`#abortHandler()`:** If the abort reason is `'interrupt'` (user submitted a new message), returns without killing the process, leaving the caller an opportunity to background it. Other abort reasons call `kill()`.
+
+This handler does not itself perform backgrounding.
+
+**`onTimeout(callback)`:** Available when automatic backgrounding is enabled. Calling it stores the supplied callback; it does not invoke it immediately.  (assign `#onTimeoutCallback` to `startBackgrounding` in `BashTool.tsx line 1036`
+
+**`#handleTimeout(self)`:** Runs when the foreground timeout expires.
+
+- If automatic backgrounding is enabled and a callback is registered, invokes that `#onTimeoutCallback` with `self.background.bind(self)`.
+- Otherwise calls `#doKill(143)`.
+
+The callback receives the bound `background()` method and can call it after arranging task ownership.
+
+**`background(taskId)`:** Transitions a running command into background execution.
+
+- Returns `false` if the command is no longer `running`.
+- Records the background task ID and changes status to `backgrounded`.
+- Removes the foreground timeout and abort listener.
+- Starts the file-size watchdog.
+- Returns `true`.
+- The primary purpose of this function is to clean up the foreground related resources, start file-size watchdog for background,  and set status as `background`.
+
+It does not spawn another process, move output to another file, or resolve the command’s result Promise. The existing child continues writing to the same output file. The
+higher-level caller can return a background-task handle while the command continues. (we will talk more later on)
+
+**`#startSizeWatchdog()`:** Every five seconds, asynchronously checks the output-file size. If the command is still backgrounded and the file exceeds the configured limit
+—5 GiB by default—it marks the size-limit condition and calls `#doKill(137)`.
+
+The timer is unreferenced so it cannot alone keep the application running. Failed size checks are ignored. Because enforcement is periodic, the file can exceed the limit
+before termination occurs.
+
+**`kill()` and `#doKill(code)`:** Mark the command as killed, request `SIGKILL` for the process tree when a PID exists, and resolve the internal exit Promise immediately.
+
+The supplied numeric code classifies the result; it does not select the OS signal:
+
+- Normal `kill()` uses result code `137`.
+- Timeout uses result code `143`.
+- Output-size termination uses result code `137`.
+- All these paths request the OS signal `SIGKILL`.
+
+Because the resolver is called immediately, result assembly does not wait for a subsequent process-exit event. `ExecResult.interrupted` is calculated as `code === 137`.
+
+**`#cleanupListeners()`:** Clears the timeout and size watchdog and removes the saved abort listener. It deliberately leaves the process `exit` and `error` listeners installed so they can still complete the result.
+
+**`cleanup()`:** Clears `TaskOutput` resources, removes lifecycle timers/listeners, and releases references to the child process, abort signal, and timeout callback.
+
+Cleanup is separate from termination: it does not itself kill the child or automatically delete its output file. The owner should call it when execution ownership and
+output handling have finished.
+
+### `runShellCommand`
+
+#### Overall flow
+
+- Define a `createProgressSignal` function which activates `race` function so that we can yield updated progress events.
+- call `exec` function that prepares and launches a new shell process, connects output capture, and returns a `ShellCommand` handle for managing its lifecycle. It does not wait for the command to finish.
+- Set up auto-backgrounding callback on timeout of `ShellCommandImpl` if enabled
+- If the caller requires run shell in background, call `spawnBackgroundTask` and return
+- Race result and `PROGRESS_THRESHOLD_MS(2s)` so that it gives us a chance to get the result without polling the task output file.
+- Start polling `TaskOutput`
+- loop for `Promise.race([resultPromise, progressSignal]` to get either progress events or final result.
+- any type of return from loop will finally stop polling `TaskOutput`.
+
+#### `createProgressSignal`
+
+- Define a `createProgressSignal` function that returns a promise resolving to `null`. Calling its `resolve` function is similar to calling `set_result` on a Python `Future`.
+
+  - When the underlying `exec` function runs, create an associated signal to wake the progress-processing loop. At line 1036, the loop waits for either the final result or a progress signal:
+
+    ```python
+    const result = await Promise.race([resultPromise, progressSignal]);
+    ```
+
+  - The underlying `exec` function’s `onProgress` callback resolves any pending progress signal and clears the reference to it. This resumes the loop at line 1036, allowing it to yield the latest progress event.
+
+  - This approach adapts a regular function with progress callbacks into an asynchronous generator, similar to `streamedCheckPermissionsAndCallTool` at line 492 in `toolExecution.js`. The main difference is that this approach retains only the latest progress event, whereas the latter queues all progress events.
+
+
+#### `exec`
+
+File: `utils/Shell.ts`
+
+This description covers the normal Bash file-mode path; hook/pipe-mode behavior is outside its scope.
+
+`exec()` **prepares and launches a new shell process, connects output capture, and returns a `ShellCommand` handle for managing its lifecycle. It does not wait for the command to finish.**
+
+**Parameters:**
+
+- `command`: The shell command to execute.
+- `abortSignal`: Signal used to manage cancellation.
+- `shellType`: Selects the Bash or PowerShell provider.
+- `options`: Optional timeout, progress callback, cwd policy, sandbox flag, automatic-backgrounding flag, and stdout callback.
+
+**Return value:** `Promise<ShellCommand>`. Awaiting `exec()` waits for setup and launch. Awaiting the returned handle’s `result` waits for the command result.
+
+**Select the shell provider:** Resolves the provider for the requested shell type. The provider supplies the shell executable, command construction, launch arguments, and
+environment overrides.
+
+**Build the command script:** Calls `provider.buildExecCommand()`. For Bash, this prepares snapshot/environment setup, command evaluation, stdin handling, and **a command that writes the final working directory into a temporary cwd file.**
+
+The cwd file is separate from the task output file.
+
+- **The cwd file records the shell’s final working directory,** so Claude Code can use that directory for subsequent commands.
+-   The generated script therefore appends: `pwd -P >| /tmp/claude-<id>-cwd`
+
+
+**Validate the working directory:** Checks whether the current directory still exists. If unavailable, attempts to fall back to the original working directory. If neither directory is available, returns a failed-command handle.
+
+**Check cancellation:** If the abort signal is already aborted at the pre-spawn check, returns an aborted-command handle without launching the shell.
+
+**Apply optional sandboxing:** If `shouldUseSandbox` is enabled, wraps the prepared command through `SandboxManager.wrapWithSandbox()` and attempts to create the sandbox
+temporary directory.
+
+`exec()` itself does not perform the tool permission-approval interaction.
+
+**Prepare output capture:**
+
+- Generates a task ID.
+- Creates a `TaskOutput` instance.
+- Creates the output directory.
+- Opens the task output file.
+- Configures child stdout and stderr to write to the same file.
+
+The child writes directly to that file through its inherited file descriptors. JavaScript does not receive and persist each output chunk in this mode.
+
+**Launch the process:** Calls `spawn()` with the shell executable, prepared arguments, environment, working directory, and stdio configuration.
+
+This is where process execution is initiated. Each invocation creates a new shell process.
+
+**Attach lifecycle management:** Calls `wrapSpawn()` to construct `ShellCommandImpl`, passing the child process, abort signal, timeout, `TaskOutput`, and automatic-
+backgrounding flag.
+
+`ShellCommandImpl` manages completion, cancellation, timeout, background-state transitions, and background output-size monitoring.
+
+The parent then closes its own output-file handle. The child retains its inherited descriptors and continues writing.
+
+**Register completion-side cleanup:** Attaches a callback to `shellCommand.result` `void shellCommand.result.then(async result => {...}` that later: 
+
+- Performs sandbox cleanup when applicable.
+- Reads the cwd file and updates application cwd when cwd changes are allowed and the command was not backgrounded.
+- Invalidates the session environment cache if cwd changed.
+- Deletes the temporary cwd file.
+
+Registering this callback does not wait for command completion. This cleanup does not delete the task output file.
+
+**Return the handle:** Returns `shellCommand`, potentially while the child process is still running.
+
+**The two completion boundaries:**
+
+- `await exec(...)`: Wait for command preparation, process launch, and wrapper setup.
+- `await shellCommand.result`: Wait for the lifecycle wrapper to produce the command result.
+
+**Responsibility boundaries:**
+
+- `BashTool.runShellCommand()`: Foreground/background orchestration and progress delivery.
+- `exec()`: Command preparation, process launch, and component setup.
+- Child process: Actual command execution.
+- `TaskOutput`: Output capture, progress snapshots, and output retrieval.
+- `ShellCommandImpl`: Process lifecycle management and result assembly.
+
+**Error handling:** Several failures produce special command handles, including an unavailable working directory, an already-aborted signal, and errors caught in the spawn/setup region.
+
+Not every setup failure is converted into a command result. Operations before the spawn-region `try`, such as provider setup or opening the output file, can reject the `exec()` Promise directly.
+
 ## Purpose and caller boundary
 
 Executes a Bash command or applies an internal approved sed preview, streams progress, and returns either completion data or a background-task handle. Model input is strict command plus optional timeout/description/background/sandbox override. The internal _simulatedSedEdit field is excluded from the model schema. Concurrency safety depends on read-only command analysis; UI search/read classification is a separate heuristic.

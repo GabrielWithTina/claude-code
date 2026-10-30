@@ -1,5 +1,7 @@
 # PowerShellTool - Windows Shell Execution And File Boundaries
 
+The [shared shell utility design](../../../shell/README.md) covers the execution provider, process/output lifecycle, PowerShell parser subprocess, and shared prefix/flag utilities beneath this tool.
+
 ## Module Map
 
 | File | Role |

@@ -114,6 +114,8 @@ before execution. Read-only classification is what lets safe commands (`ls`, `gi
 
 ## Documents
 
+The [shared shell utility design](../../../shell/README.md) covers the implementation beneath this tool: `Shell.exec`, providers, snapshot capture/replay, process and output ownership, and command analysis.
+
 | File | Covers |
 |------|--------|
 | [bashtool.md](./bashtool.md) | `BashTool.tsx` + `prompt.ts`: schemas, ToolDef lifecycle, the `call()` execution engine, background tasks, image output |

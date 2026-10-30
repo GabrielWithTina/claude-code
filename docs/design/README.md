@@ -160,6 +160,8 @@ sequenceDiagram
 | [context.md](./context.md) | System-prompt assembly, CLAUDE.md loading, git status, cache boundary |
 | [memory.md](./memory.md) | Memory system: CLAUDE.md instruction memory, auto-memory, team memory, agent memory, session memory, storage and load paths |
 | [tool-system.md](./tool-system.md) | `Tool` interface, `ToolUseContext`, `buildTool()`, registry assembly (`getTools`, `assembleToolPool`) |
+| [shell/README.md](./shell/README.md) | Shared shell utilities: execution, providers, snapshots/environment, process lifecycle/output, Bash and PowerShell analysis, and supporting subprocess helpers |
+| [task/README.md](./task/README.md) | Shared task utilities: state registration and eviction, file/pipe output capture, progress signaling, disk write queues, output formatting, and SDK delivery |
 | [tools/README.md](./tools/README.md) | Tool-specific design documents, grouped by subsystem, including AgentTool internals |
 | [tools/orchestration-internals.md](./tools/orchestration-internals.md) | Source-order tool-call bridge: streaming/non-streaming scheduling, invocation pipeline, hooks, permissions, result delivery, and cancellation |
 | [permissions.md](./permissions.md) | Permission modes, `ToolPermissionContext`, rule sources, `canUseTool` dispatch, protected files |
