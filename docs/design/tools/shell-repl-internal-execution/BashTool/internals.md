@@ -6,7 +6,7 @@ Source: [tools/BashTool/BashTool.tsx](../../../../../tools/BashTool/BashTool.tsx
 
 ### `mapToolResultToToolResultBlockParam`
 
-- Structured output (TODO, when cut this?)
+- Structured output (Codex claim there is no place to generate this type of output in current source code)
 - Image based64
 - Text
   - Large size result
@@ -21,9 +21,12 @@ Source: [tools/BashTool/BashTool.tsx](../../../../../tools/BashTool/BashTool.tsx
 - Keep only the specified maximum length of  `stdout` to avoid the oversized outcome
 - Inspect and normalize the error code and error message from the the exit code. some of non-zero exit code doesn't mean error.
 - If current agent is the main agent, reset the working directory to the original one in case it has been changed by the bash execution.
-- If the result is huge and has associated output file path, link/copy the file to the dedicated project scope path
+- If the result contains associated output file path (result size is large),  link/copy the file to the dedicated project scope tool-result path. if the result size is larger than 64MB, truncate the file to 64MB size.
 - Non-interrupted error raises the exception.
 - If `stdout` is an image, resize the image with an appropriate size.
+  - This is for the case where bash command output base64 based image directly.
+  - For the case that persist the image into the file. LLM can use `FileReadTool` to load this image later on.
+
 - return
 
 
@@ -109,8 +112,7 @@ The implementation listens for `exit`, not `close`, so completion does not wait 
 **`#exitHandler(code, signal)`:** Converts the process exit event into a numeric result and calls `#resolveExitCode()`.
 
 - Uses the supplied exit code when available.
-- If there is no exit code and the signal is `SIGTERM`, maps it to `144`.
-- Otherwise falls back to `1`.
+- If there is no exit code and the signal is `SIGTERM`, maps it to `144`, Otherwise falls back to `1`.
 
 The `144` mapping is the current implementation’s behavior, distinct from its internal timeout code of `143`.
 
@@ -296,11 +298,341 @@ Registering this callback does not wait for command completion. This cleanup doe
 
 Not every setup failure is converted into a command result. Operations before the spawn-region `try`, such as provider setup or opening the output file, can reject the `exec()` Promise directly.
 
+#### `startBackgrounding()`
+
+File: `tools/BashTool/BashTool.tsx`
+Location: Lines 924–963, nested inside `runShellCommand()`.
+
+This description covers the normal Bash file-mode path.
+
+`startBackgrounding()` **arranges background ownership for an already-running shell command and records its task ID so the Bash generator can return control.**
+
+It chooses between converting an existing foreground task in place and registering a new background task for the existing subprocess.
+
+**IMHO, the complexity is caused by the late foreground task registration occurring at the progress loop phase, while maybe improving a bit of performance, it introduce additional complexity of approaching transition. we could register the associated task when creating a sub process, and then always update registered task to conveying the background transition.**
+
+**Parameters:**
+
+- `eventName`: Analytics event name identifying the backgrounding trigger.
+- `backgroundFn`: Optional callback receiving the background task ID. The timeout path supplies the shell wrapper’s bound `background()` method.
+
+**Return value:** `void`.
+
+The function does not return a task ID, expose a completion Promise, or wait for subprocess completion. It communicates the background task ID through the enclosing
+`backgroundShellId` variable.
+
+**Captured context:** As a nested function, it accesses the current invocation’s:
+
+- `foregroundTaskId`: Existing foreground task registration, if present.
+- `shellCommand`: Wrapper for the running subprocess.
+- `command` and `description`: Command text and task description.
+- `setAppState` and `toolUseId`: Task-state update channel and originating tool invocation.
+- `spawnBackgroundTask()`: Helper that registers background ownership.
+- `resolveProgress`: Resolver used to wake the generator’s progress wait.
+
+**When it is called:**
+
+The current implementation has two direct callers:
+
+- **Command timeout:** When `shellCommand.onTimeout` exists and `shouldAutoBackground` is true, the timeout handler calls this function with event name
+`tengu_bash_command_timeout_backgrounded` and the supplied `backgroundFn`.
+- **Assistant blocking budget:** After 15 seconds, an enabled and active KAIROS main-thread invocation calls it with event name
+`tengu_bash_command_assistant_auto_backgrounded`, provided background tasks are enabled, explicit background execution was not requested, and the shell is still running
+without a recorded background ID.
+
+The assistant timer sets `assistantAutoBackgrounded = true` before calling this function.
+
+The command allowlist check used by timeout backgrounding is not part of the assistant timer’s condition. Consequently, the assistant timer can background a command that
+timeout-driven backgrounding would exclude.
+
+Explicit `run_in_background: true` calls `spawnBackgroundTask()` directly. Manual Ctrl+B backgrounding follows a separate task-management path.
+
+**Existing foreground task branch:** First checks whether `foregroundTaskId` is present.
+
+A foreground task can have been registered by the generator’s progress loop when the background hint becomes available. Foreground registration means the command already
+has application task bookkeeping even though its execution is still blocking the tool invocation.
+
+If the ID exists, this function calls:
+
+```ts
+backgroundExistingForegroundTask(
+  foregroundTaskId,
+  shellCommand,
+  description || command,
+  setAppState,
+  toolUseId
+)
+```
+
+That helper transitions the shell wrapper, updates the existing task’s background flag, starts its stall watchdog, and attaches completion handling.
+
+Reusing the registration avoids overwriting the task record, emitting another task-start event, or creating another shutdown-cleanup registration.
+
+**If the transition fails:** When `backgroundExistingForegroundTask()` returns `false`, `startBackgrounding()` immediately returns.
+
+It does not assign `backgroundShellId`, log the backgrounding event, or invoke `backgroundFn`.
+
+The helper’s Boolean confirms the shell-wrapper transition; it does not independently guarantee that the application task entry was updated.
+
+**If the transition succeeds:** The function:
+
+1. Assigns `foregroundTaskId` to `backgroundShellId`.
+2. Logs `eventName` with `command_type`.
+3. Invokes `backgroundFn(foregroundTaskId)` when supplied.
+4. Returns.
+
+This branch does not explicitly resolve `resolveProgress`. A subsequent progress callback normally wakes the generator so it can observe `backgroundShellId`.
+
+**No existing foreground task branch:** If `foregroundTaskId` is absent, the function starts:
+
+```ts
+void spawnBackgroundTask().then(shellId => {
+  // Record the ID, wake progress, log, and invoke the callback.
+})
+```
+
+`spawnBackgroundTask()` calls `spawnShellTask()` with the existing `shellCommand`, command description, tool-use ID, and agent ID.
+
+Despite the helper names, this path does not launch another subprocess. It registers a background task around the already-running shell.
+
+The registered task ID comes from `shellCommand.taskOutput.taskId`, preserving the association between the task and its output file.
+
+The underlying registration and transition work occurs without an internal `await` in `spawnShellTask()`, but this function’s `.then()` callback still runs
+asynchronously.
+
+**After background registration resolves:** The callback:
+
+1. Stores the returned ID in `backgroundShellId`.
+2. Captures `resolveProgress`.
+3. If a resolver exists, clears `resolveProgress` and invokes the captured resolver.
+4. Logs `eventName` with `command_type`.
+5. Invokes `backgroundFn(shellId)` when supplied.
+
+The ID is stored before the progress signal is resolved, so the resumed generator can observe the background state.
+
+**Overall flow:**
+
+1. Receive a backgrounding trigger and optional callback.
+2. Check whether a foreground task is already registered.
+3. Convert that task in place, or register background ownership for the existing shell.
+4. Record the background task ID.
+5. Explicitly wake the progress wait in the new-registration branch.
+6. Log the trigger and invoke the optional callback.
+7. Let the generator return a background-task result, unless command completion wins.
+8. Let task completion handling later perform cleanup, state updates, and notification delivery.
+
+#### `spawnShellTask()`
+
+File: `tasks/LocalShellTask/LocalShellTask.tsx`
+
+This description covers the normal Bash file-mode path; hook/pipe-mode behavior is outside its scope.
+
+`spawnShellTask()` **registers an already-running shell command as a background task and installs its completion handling.** Despite its name, it does not spawn another subprocess. The existing process was launched earlier by `Shell.exec()`.
+
+**Parameters:**
+
+- `input`: Command text, description, existing `shellCommand`, optional tool-use ID, agent ID, and task kind.
+- `context`: Application context. This function directly uses `setAppState` to register and update task state.
+
+**Return value:** `Promise<TaskHandle>`, containing the task ID and a cleanup-registration removal function.
+
+Awaiting `spawnShellTask()` waits for task setup, not for the subprocess to finish. The function registers completion callbacks and returns the handle while execution
+continues.
+
+**Reuse the existing task ID:** Reads `shellCommand.taskOutput.taskId`. This keeps the registered task ID consistent with the existing output file. It does not generate a
+new process or output file.
+
+**Register shutdown cleanup:** Calls `registerCleanup()` with a callback that invokes `killTask(taskId, setAppState)`.
+
+This allows application cleanup (when graceful shutdown) to stop the background task. The returned `unregisterCleanup` function removes this cleanup registration when called.
+
+**Construct the task state:** Creates a `LocalShellTaskState` using `createTaskStateBase()` and additional shell-specific fields.
+
+- `status: 'running'`: The command is still executing.
+- `isBackgrounded: true`: The command is managed as a background task.
+- `command`: The original command text.
+- `shellCommand`: The existing process-management handle.
+- `unregisterCleanup`: The function that removes the shutdown cleanup registration.
+- `agentId`: Optional association with the agent that owns the task.
+- `kind`: Optional task presentation variant.
+- Additional fields track output reporting and notification bookkeeping.
+
+The task's `status` and `isBackgrounded` describe different things. A command can be both running and backgrounded.
+
+**Register the task:** Calls `registerTask(taskState, setAppState)`.
+
+This adds the task to `AppState.tasks[taskId]`. For a newly registered ID, `registerTask()` also enqueues an SDK `task_started` event, subject to the SDK queue's delivery policy.
+
+**Transition the shell wrapper:** Calls `shellCommand.background(taskId)`.
+
+For Bash, this records the background task ID, changes the wrapper status to `backgrounded`, removes the foreground timeout and abort listener, and starts the output-file size watchdog.
+
+The same child process continues writing to the same output file. Its result Promise remains pending until completion or termination.
+
+The current function does not inspect the Boolean return value of `background()`, so this call alone does not guarantee that a transition occurred if the process has already finished.
+
+**Start the stall watchdog:** Calls `startStallWatchdog()` and saves its cancellation function.
+
+This watchdog checks for prolonged inactivity and output suggesting that the command is waiting for interactive input. It is separate from the output-file size watchdog managed by `ShellCommandImpl`.
+
+**Register completion handling:** Attaches an asynchronous callback through `shellCommand.result.then(...)`.
+
+The callback is registered immediately but executes only after the existing command's result Promise resolves. The surrounding `void` discards the Promise returned by
+`.then()`; it does not wait for completion.
+
+**When the command completes, the registered callback:**
+
+- Cancels the stall watchdog.
+- Calls `flushAndCleanup(shellCommand)` to flush captured output and clean up the shell wrapper.
+- Updates the task through `updateTaskState()`.
+- Preserves the task state if it was already marked `killed`.
+- Otherwise sets status to `completed` when the exit code is zero, or `failed` when it is nonzero.
+- Stores the exit code and interruption flag.
+- Clears the task's `shellCommand` reference and stored `unregisterCleanup` field.
+- Records the completion timestamp.
+- Calls `enqueueShellNotification()` with the final status and exit code.
+- Calls `evictTaskOutput(taskId)` without waiting for it.
+
+Clearing the stored `unregisterCleanup` field is not the same as invoking that function. In this completion branch, the function is not explicitly called.
+
+**Completion notification:** `enqueueShellNotification()` checks notification bookkeeping before enqueueing a message. The notification includes the task ID, output-file path, status, and summary. It does not embed the complete command output.
+
+The addressed main or agent loop can later consume the notification and read the output file when needed.
+
+**Output eviction:** `evictTaskOutput()` flushes and removes a map-backed disk writer if one exists. It does not delete the output file. Normal Bash file-mode output is written directly by the child process, so there may be no map-backed writer to evict.
+
+**Return the task handle:** After setup, the function returns an object containing `taskId` and `cleanup`.
+
+The returned `cleanup()` invokes `unregisterCleanup()`. It removes the shutdown cleanup registration; it does not itself kill the process, remove task state, or delete output.
+
+**Foreground handoff boundary:** `spawnShellTask()` does not resolve the Bash generator's progress signal or return the foreground tool result. The higher-level
+`spawnBackgroundTask()` and `startBackgrounding()` logic handles that handoff.
+
+**Overall flow:**
+
+1. Receive the existing shell process wrapper.
+2. Reuse its output/task ID.
+3. Register shutdown cleanup.
+4. Create and register background task state.
+5. Transition the shell wrapper to background mode.
+6. Start the stall watchdog.
+7. Attach the eventual completion callback.
+8. Return the task handle.
+9. Later, process completion triggers state updates and notification delivery.
+
+#### `backgroundExistingForegroundTask()`
+
+File: `tasks/LocalShellTask/LocalShellTask.tsx`
+
+This description covers the normal Bash file-mode path.
+
+`backgroundExistingForegroundTask()` **converts an already-registered foreground shell task into a background task.** It reuses the existing task ID, subprocess, shell
+wrapper, and output file.
+
+**Unlike `spawnShellTask()`, it updates the existing task record rather than registering a new one.** This avoids replacing task bookkeeping, emitting another task-start
+event, or creating another shutdown cleanup registration.
+
+**Parameters:**
+
+- `taskId`: ID of the existing foreground task.
+- `shellCommand`: Wrapper for the already-running subprocess.
+- `description`: Description used by watchdog and completion notifications.
+- `setAppState`: Updates the application's task state.
+- `toolUseId`: Optional identifier associating the task with its originating tool invocation.
+
+**Return value:** A Boolean. The function returns synchronously after arranging background ownership and completion handling. It does not wait for subprocess completion.
+
+**Transition the shell wrapper:** First calls `shellCommand.background(taskId)`.
+
+If that call returns `false`, this function immediately returns `false`. This normally means the shell wrapper is no longer in the `running` state.
+
+For Bash, a successful transition records the background task ID, changes wrapper status to `backgrounded`, removes foreground timeout/abort handling, and starts the output-file size watchdog.
+
+**Update the existing application task:** Calls `setAppState()` and looks up `prev.tasks[taskId]`.
+
+If the entry is a local shell task and is not already backgrounded, the updater:
+
+- Captures its `agentId` for notification routing.
+- Preserves its existing fields.
+- Changes `isBackgrounded` to `true`.
+
+The application task's status remains `running`; backgrounding does not mean execution has completed.
+
+If the entry is missing, is not a local shell task, or is already backgrounded, the updater returns the unchanged application state.
+
+The current implementation does not return failure for those state-update no-op cases. Once `shellCommand.background()` succeeds, the function continues and eventually
+returns `true`. Therefore, its return value confirms the wrapper transition, not independent validation of the application task entry.
+
+**Start the stall watchdog:** Calls `startStallWatchdog()` and saves its cancellation function.
+
+This watchdog detects prolonged output inactivity combined with text suggesting an interactive prompt. It sends a notification rather than terminating the command.
+
+The task-kind argument is `undefined`, which does not disable this watchdog. The output-file size watchdog was already started separately by `shellCommand.background()`.
+
+**Register completion handling:** Attaches an asynchronous callback through `shellCommand.result.then(...)`.
+
+The callback observes the existing command's result Promise. It does not start another process or restart execution. The surrounding `void` discards the Promise returned
+by `.then()` without waiting for completion.
+
+**When the command completes, the registered callback:**
+
+- Cancels the stall watchdog.
+- Awaits `flushAndCleanup(shellCommand)`.
+- Updates the existing task through `updateTaskState()`.
+- Preserves the task if it was already marked `killed`.
+- Otherwise records `completed` for exit code zero or `failed` for a nonzero exit code.
+- Stores the exit code and interruption flag.
+- Clears the task's `shellCommand` reference.
+- Captures and clears the stored shutdown-cleanup registration.
+- Records `endTime`.
+- Invokes the captured cleanup-removal function outside the state updater.
+- Calls `enqueueShellNotification()` with the final status and exit code.
+- Starts `evictTaskOutput(taskId)` without awaiting it.
+
+In the already-killed branch, the updater returns the existing task before capturing its cleanup-removal function. Cleanup for that branch therefore depends on the kill
+path.
+
+**Output and resource cleanup:** `flushAndCleanup()` awaits `shellCommand.taskOutput.flush()` and calls `shellCommand.cleanup()`, logging errors if they occur.
+
+For Bash file mode, flushing does not control the child's direct file-descriptor writes. Shell cleanup clears capture resources and lifecycle listeners. It does not
+automatically delete the background output file.
+
+`evictTaskOutput()` removes a map-backed disk writer if one exists, while preserving its output file.
+
+**Completion notification:** `enqueueShellNotification()` checks notification bookkeeping to avoid duplicate delivery. When eligible, it queues a task notification
+containing the task ID, output-file path, terminal status, and summary.
+
+The captured `agentId` routes the notification to the owning agent; an undefined agent ID addresses the main loop.
+
+The notification references the output file rather than embedding the entire command output.
+
+**Return after setup:** After installing the completion callback, the function returns `true`. The child process can continue running independently.
+
+**Foreground wake-up is handled elsewhere:** This function does not resolve the Bash generator's progress signal.
+
+Its caller, `startBackgrounding()`, records the ID in `backgroundShellId`. In the existing-foreground branch, a later progress callback normally wakes the generator's
+`Promise.race()`. The generator then sees the background state and returns a background-task result.
+
+Actual process completion is handled later by the callback registered here.
+
+**Overall flow:**
+
+1. Receive the existing foreground task and shell wrapper.
+2. Transition the wrapper to background mode.
+3. Update the existing task's `isBackgrounded` field.
+4. Start the interactive-stall watchdog.
+5. Register completion handling on the existing result Promise.
+6. Return `true` without awaiting process completion.
+7. The higher-level caller completes the foreground handoff.
+8. Later, process completion triggers cleanup, task-state updates, and notification delivery.
+
 ## Purpose and caller boundary
 
 Executes a Bash command or applies an internal approved sed preview, streams progress, and returns either completion data or a background-task handle. Model input is strict command plus optional timeout/description/background/sandbox override. The internal _simulatedSedEdit field is excluded from the model schema. Concurrency safety depends on read-only command analysis; UI search/read classification is a separate heuristic.
 
 The [shared invocation lifecycle](../../invocation-lifecycle.md) explains registry selection, schema validation, authorization, hooks, result mapping, and exception handling. The sequence below begins with a model tool request and ends at the parent conversation boundary; external services and background workers retain their own lifecycles.
+
+
 
 ## Source-order walkthrough
 
@@ -378,58 +710,215 @@ If backgroundShellId is set, return handle; if foreground task status became bac
 
 ## End-to-end sequence
 
+This sequence expands the components outlined in **IMHO - Overall Sequence Flow**. It follows the normal Bash file-mode path: `call()` consumes the `runShellCommand()` generator; `Shell.exec()` creates the process, `TaskOutput`, and `ShellCommandImpl`; task helpers arrange background ownership. The approved sed-preview shortcut bypasses this shell lifecycle and returns through `applySedEdit()`.
+
+The parallel branches below distinguish process completion from foreground orchestration. They share the same `shellCommand.result` Promise: the cwd callback, generator wait, and selected background-completion callback are independent observers. Backgrounding keeps the existing subprocess and output file.
+
 ```mermaid
 sequenceDiagram
-    participant Q as Parent query
-    participant E as Tool executor
-    participant T as BashTool
-    participant D as ShellCommand / TaskOutput / LocalShellTask
-    Q->>E: tool_use(name, input, id)
-    E->>E: Parse input, validate, run hooks and authorization
-    alt Execution permitted
-        E->>T: call(approved input, context)
+    autonumber
+    participant E as Tool executor / owning query
+    participant T as BashTool.call / result mapper
+    participant G as runShellCommand generator
+    participant X as Shell.exec
+    participant P as Child shell process
+    participant S as ShellCommandImpl
+    participant O as TaskOutput
+    participant L as LocalShellTask helpers
+    participant U as BackgroundHint / keyboard
+
+    E->>E: Parse input, validate, run hooks and authorize
+    alt Execution prevented
+        E->>E: Return rejection/error without calling BashTool.call
+    else Execution permitted
+        E->>T: call(approved input, context, onProgress)
         alt Internal approved sed preview
-            T->>D: Snapshot/write approved file content, update editor/read state
-        else Shell execution
-            T->>D: exec(command, signal, bash, sandbox/cwd/timeout options)
-            D-->>T: ShellCommand and result promise
-            alt Explicit background
-                T->>D: spawnShellTask around existing command
-                T->>T: Return running task ID
-            else Foreground wait
-                loop Until completion or task transfer
-                    D-->>T: Poller output/progress or process completion
-                    T-->>E: Yield bash_progress
-                    opt Timeout, assistant budget, or user backgrounds command
-                        T->>D: Register/convert task, transfer lifecycle ownership
+            T->>T: applySedEdit(), update file/editor/read state
+        else Normal shell execution
+            T->>G: Create generator, repeatedly await next()
+            G->>G: Define createProgressSignal() and onProgress callback
+            G->>X: await exec(command, signal, bash, options)
+            X->>X: Resolve provider and buildExecCommand()
+            Note over X,P: Script restores snapshot/environment, evaluates command,<br/>then writes final cwd to a separate temporary file when reached.
+            X->>X: Validate/recover cwd, check abort, optionally wrap sandbox
+            X->>O: new TaskOutput(taskId, onProgress, stdoutToFile=true)
+            X->>X: Open task output file
+            X->>P: spawn(shell, args, cwd, stdout/stderr=file fd)
+            Note over P,O: Child writes directly to the output file.<br/>TaskOutput reads snapshots, it does not relay each write.
+            X->>S: wrapSpawn() creates ShellCommandImpl(child, signal, timeout, TaskOutput)
+            S->>S: #createResultPromise(): install exit/error/abort listeners and timeout
+            S->>S: exitPromise.then(#handleExit), expose result Promise
+            X->>X: Close parent's output fd, child retains inherited descriptors
+            X->>S: Register result.then(cwd adoption and cwd-file cleanup)
+            X-->>G: ShellCommand handle, process can still be running
+            Note over G,X: Early failure may return a failed/aborted handle, setup can also reject.
+            G->>S: onTimeout(callback) when automatic backgrounding is allowed
+            G->>G: Schedule 15s assistant timer when eligible
+
+            par Process lifecycle and result observers
+                alt Shell exits or emits an error
+                    P-->>S: exit / error event
+                    S->>S: #exitHandler() / #errorHandler() -> #resolveExitCode(code)
+                else Non-interrupt abort or timeout without background handler
+                    S->>S: kill() / #doKill(code), mark killed
+                    S->>P: Request SIGKILL for process tree
+                    S->>S: #resolveExitCode(code) without waiting for exit event
+                else Background output exceeds limit
+                    S->>S: Size watchdog detects more than 5 GiB by default
+                    S->>P: #doKill(137): request SIGKILL for process tree
+                    S->>S: #resolveExitCode(137)
+                end
+                S->>S: exitPromise reaction: #handleExit(code)
+                S->>S: Clear timers/abort listener, mark completed unless killed
+                S->>O: await getStdout(), getStderr()
+                O-->>S: Bounded output prefix, file size, redundancy flag
+                alt Foreground output fits entirely inline
+                    S->>O: deleteOutputFile() without awaiting
+                else Large foreground output
+                    S->>S: Include outputFilePath, outputFileSize, outputTaskId
+                else Background output
+                    S->>S: Include backgroundTaskId, retain output file
+                end
+                S->>S: Resolve public result Promise with ExecResult
+                S-->>X: Run previously registered result.then callback
+                X->>X: Sandbox cleanup, adopt cwd only if allowed and not backgrounded
+                X->>X: Delete cwd temporary file
+                opt A background helper installed its completion observer
+                    S-->>L: Run selected result.then callback
+                    L->>L: Cancel stall watchdog, await flushAndCleanup(shellCommand)
+                    L->>L: Update task status/result/endTime, preserve killed status
+                    L->>L: enqueueShellNotification(): deduplicate, derive output path
+                    L-->>E: Queue task-notification for owning agent/session
+                    L->>L: evictTaskOutput(): retain file for later reading
+                end
+            and Foreground wait, progress, and background handoff
+                alt Explicit run_in_background and background tasks enabled
+                    G->>L: spawnBackgroundTask() -> spawnShellTask(existing shellCommand)
+                    L->>L: Register task and shutdown cleanup using TaskOutput.taskId
+                    L->>S: background(taskId)
+                    S->>S: Set backgrounded, remove foreground timeout/abort handler, start size watchdog
+                    L->>L: Start stall watchdog and register result.then(completion handler)
+                    L-->>G: taskId
+                    G-->>T: Return handoff ExecResult with backgroundTaskId, code=0
+                else Foreground execution
+                    G->>G: Await race(resultPromise, initial 2s threshold)
+                    alt Result wins initial wait
+                        G->>S: cleanup()
+                        S->>O: clear() capture resources
+                        G-->>T: Return actual ExecResult
+                    else Initial wait ends and backgroundShellId already exists
+                        G-->>T: Return background handoff ExecResult
+                    else Continue waiting in progress loop
+                        G->>O: TaskOutput.startPolling(taskId)
+                        loop Until completion or background handoff
+                            G->>G: createProgressSignal(), await race(resultPromise, progressSignal)
+                            opt Shared output poller ticks while waiting
+                                O->>O: #tick() -> tailFile(), derive progress snapshot
+                                O-->>G: onProgress(previews, counts, size, isIncomplete)
+                                G->>G: Save latest snapshot, clear and resolve pending progress signal
+                            end
+                            opt Eligible timeout or assistant timer fires while waiting
+                                alt Foreground timeout with background callback
+                                    S-->>G: #handleTimeout(): invoke callback with bound background()
+                                else Eligible assistant timer at 15s
+                                    G->>G: Set assistantAutoBackgrounded=true
+                                end
+                                G->>G: startBackgrounding(eventName, optional backgroundFn)
+                                alt foregroundTaskId exists
+                                    G->>L: backgroundExistingForegroundTask(taskId, shellCommand, ...)
+                                    L->>S: background(taskId)
+                                    alt Wrapper transition succeeds
+                                        L->>L: Set isBackgrounded, start stall watchdog, attach result.then
+                                        L-->>G: true
+                                        G->>G: Set backgroundShellId, log, invoke optional backgroundFn
+                                    else Wrapper no longer running
+                                        L-->>G: false, startBackgrounding returns without handoff
+                                    end
+                                else No foreground registration
+                                    G->>L: spawnBackgroundTask() -> spawnShellTask(existing shellCommand)
+                                    L->>L: Register task and shutdown cleanup
+                                    L->>S: background(taskId)
+                                    L->>L: Start stall watchdog, attach result.then
+                                    L-->>G: taskId via Promise continuation
+                                    G->>G: Set backgroundShellId, resolve pending progress signal, log/callback
+                                end
+                                Note over G,S: Successful background() removes foreground timeout/abort handling<br/>and starts the size watchdog. No process is restarted.<br/>Only the new-registration branch explicitly wakes the progress signal.
+                            end
+                            alt resultPromise wins
+                                opt Completion result carries backgroundTaskId
+                                    G->>L: markTaskNotified(taskId) to suppress pending duplicate notification
+                                    G->>G: Clear backgroundTaskId, restore large-output file metadata
+                                end
+                                opt Ordinary completion with a registered foreground task
+                                    G->>L: unregisterForeground(taskId)
+                                end
+                                G->>S: cleanup()
+                                S->>O: clear()
+                                G-->>T: Return actual completed result, including race correction if needed
+                            else Progress signal wins
+                                alt backgroundShellId is set
+                                    G-->>T: Return background handoff ExecResult
+                                else Registered wrapper status is backgrounded by user
+                                    G-->>T: Return taskId and backgroundedByUser=true
+                                else Still running in foreground
+                                    opt Backgrounding enabled, elapsed threshold reached, setToolJSX available
+                                        G->>L: registerForeground(...) once
+                                        L-->>G: foregroundTaskId (same TaskOutput.taskId)
+                                        G->>U: setToolJSX(BackgroundHint)
+                                    end
+                                    G-->>T: yield progress snapshot
+                                    T-->>E: onProgress(bash_progress)
+                                    T->>G: await next()
+                                end
+                            end
+                            Note over O,G: Shared 1s poller: #tick() -> tailFile() -> onProgress().<br/>The callback stores the latest snapshot and resolves progressSignal,<br/>including for empty output. Reads can overlap.
+                            opt User presses Ctrl+B while BackgroundHint is mounted
+                                U->>L: task:background -> backgroundAll() -> backgroundTask(taskId)
+                                L->>S: background(taskId)
+                                L->>L: On success, set isBackgrounded, start watchdog, attach result.then
+                                Note over G,U: Bypasses startBackgrounding(), next progress wake observes wrapper status.<br/>backgroundAll also visits other foreground shell/agent tasks.
+                            end
+                        end
+                        G->>O: finally: TaskOutput.stopPolling(taskId)
                     end
                 end
-                T->>D: Stop foreground polling, cleanup only when foreground completes
             end
-            T->>T: Interpret result, throw semantic/pre-spawn failures
-            opt Large completed output
-                T->>D: Cap raw file, hard-link/copy result artifact
+            Note over G,L: Background handoff can return before process completion.<br/>code=0 in a handoff is not the eventual exit code.<br/>The parallel lifecycle branch continues under task ownership.
+            T->>T: Accumulate bounded stdout, interpret semantic exit code
+            T->>T: Apply main-thread cwd policy, annotate sandbox failures
+            T->>T: finally: clear progress JSX on success or failure
+            alt Pre-spawn error or semantic error unless user interrupt
+                T-->>E: Propagate Error / ShellError, executor handles failure
+            else Result accepted
+                opt outputFilePath and outputTaskId are present
+                    T->>T: Stat original size, truncate source to 64 MiB if needed
+                    T->>T: Hard-link to tool-results, fall back to copyFile()
+                end
+                T->>T: Strip empty lines/hints, detect and resize image, construct Out
             end
-            T->>T: Strip hints, resize image if needed, build result
+            Note over E,T: The finally block clears JSX on both success and failure.<br/>A thrown call skips persistence and normal result mapping.
         end
-        Note over Q,D: Background completion, notification, and cleanup happen later in LocalShellTask.
-        alt Call and result processing complete normally
-            T-->>E: Structured data and optional side channels
-            E->>T: mapToolResultToToolResultBlockParam(data, id)
+        opt call() returns normally
+            T-->>E: data: Out
+            E->>T: mapToolResultToToolResultBlockParam(data, toolUseID)
+            alt Nonempty structuredContent supplied
+                T->>T: Forward content blocks (normal call path does not populate this field)
+            else Recognized image with successful conversion
+                T->>T: buildImageToolResult(stdout, toolUseID)
+            else Text result
+                T->>T: Format persisted-output preview, stderr/interrupt, background ID/path
+            end
             T-->>E: Model-facing tool_result
-            E-->>Q: Tool result and associated events
-        else Call or result processing throws
-            E->>E: Failure handling and applicable failure hooks
-            E-->>Q: Error result and associated events
+            E->>E: Continue query subject to cancellation and turn/budget limits
         end
-    else Validation, hook, or permission prevents execution
-        E-->>Q: Rejection/error result, call is skipped
     end
-    Note over E,Q: A thrown call or mapper error follows the executor error path.
-    Q->>Q: Incorporate result, continue or terminate the query
 ```
 
-The success arrows after `call` describe normal completion. An exception skips normal result mapping; see the failure boundaries below. Query continuation remains subject to cancellation and turn/budget limits.
+The automatic-backgrounding branches above expand a representative trigger during the progress loop. Their handlers are installed before the initial wait, so backgrounding can also occur during that wait; the initial `backgroundShellId` check handles that case. Explicit backgrounding skips both the initial wait and progress polling.
+
+The two completion callbacks do not replace each other or form a Promise chain. The cwd callback performs its relevant work synchronously before yielding; the task callback awaits output flushing. The generator can therefore observe the completed result while task finalization is still pending. In the progress-loop completion race it marks the task notified before returning the actual result, rather than reporting a background handoff as well.
+
+The task completion observer above summarizes the separate **Background completion sequence** below. Notifications contain the task ID, optional tool-use ID, output-file path, status, and summary; stdout/stderr remains in the retained output file. Consumers read that file directly or use `TaskOutput` to retrieve output and the stored exit code.
 
 ## Background completion sequence
 
