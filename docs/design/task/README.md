@@ -66,6 +66,7 @@ There are three separate lifetimes:
 
 ## Related documentation
 
+- [Runtime task implementations](../tasks/README.md): source-order lifecycle walkthroughs for the concrete modules under `tasks/`.
 - [Shell utilities](../shell/README.md): process setup, providers, snapshots, and lifecycle.
 - [Shell lifecycle and output](../shell/lifecycle-and-output.md): process ownership and completion promises.
 - [Bash internals](../tools/shell-repl-internal-execution/BashTool/internals.md): tool-level backgrounding, semantic exit handling, and progress iteration.

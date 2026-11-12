@@ -162,6 +162,7 @@ sequenceDiagram
 | [tool-system.md](./tool-system.md) | `Tool` interface, `ToolUseContext`, `buildTool()`, registry assembly (`getTools`, `assembleToolPool`) |
 | [shell/README.md](./shell/README.md) | Shared shell utilities: execution, providers, snapshots/environment, process lifecycle/output, Bash and PowerShell analysis, and supporting subprocess helpers |
 | [task/README.md](./task/README.md) | Shared task utilities: state registration and eviction, file/pipe output capture, progress signaling, disk write queues, output formatting, and SDK delivery |
+| [tasks/README.md](./tasks/README.md) | Concrete runtime task internals: shell, local/remote agent, background main session, in-process teammate, dream, stop dispatch, and presentation |
 | [tools/README.md](./tools/README.md) | Tool-specific design documents, grouped by subsystem, including AgentTool internals |
 | [tools/orchestration-internals.md](./tools/orchestration-internals.md) | Source-order tool-call bridge: streaming/non-streaming scheduling, invocation pipeline, hooks, permissions, result delivery, and cancellation |
 | [permissions.md](./permissions.md) | Permission modes, `ToolPermissionContext`, rule sources, `canUseTool` dispatch, protected files |

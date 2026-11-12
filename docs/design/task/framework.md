@@ -20,7 +20,7 @@ Primary sources: [framework.ts](../../../utils/task/framework.ts), [Task.ts](../
 
 `updateTaskState(taskId, setAppState, updater)` performs its lookup inside the state updater, against current `prev.tasks`. Missing tasks are a no-op. If the supplied updater returns the same task reference, the helper returns `prev` unchanged, avoiding a new tasks-map reference and unnecessary subscribers' work. Otherwise it copies the state and task map and replaces just that task.
 
-`registerTask(task, setAppState)` inserts or replaces state. When an existing task has a `retain` property, it carries forward `retain`, `startTime`, `messages`, `diskLoaded`, and `pendingMessages`. This preserves the panel/transcript state across replacement; it does not merge every old field.
+`registerTask(task, setAppState)` inserts or replaces state. When an existing task has a `retain` property (IMHO **This is agent task**), it carries forward `retain`, `startTime`, `messages`, `diskLoaded`, and `pendingMessages`. This preserves the panel/transcript state across replacement; it does not merge every old field.
 
 After the state update, a new ID emits SDK `task_started`; a replacement emits no second start event. Optional `workflowName` and `prompt` fields are copied into that event when present. Delivery then depends on `enqueueSdkEvent()`'s headless-session gate, described in [delivery](./delivery.md).
 
@@ -57,7 +57,7 @@ State eviction does not call `cleanupTaskOutput()`, stop the process, or evict a
 |---|---|
 | Notified and terminal | Record ID as an eviction candidate; do not read output |
 | Notified and pending | Skip |
-| Running, whether notified or not | Read a bounded delta starting at `outputOffset`; record the new offset if content is nonempty |
+| Running, whether notified or not | Read a bounded delta starting at `outputOffset`; record the new offset if content is nonempty (**It appears to be a dead code which only advance read-offset but no place uses it**) |
 | Other state | No offset patch or attachment |
 
 Despite the name and older comments, **the function never pushes an attachment into its array**. It returns `{ attachments: [], updatedTaskOffsets, evictedTaskIds }`. The output delta is used to advance the cursor, not returned as progress text. Completion notifications are deliberately left to each task implementation to avoid duplicate delivery.

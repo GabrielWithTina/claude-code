@@ -18,15 +18,14 @@ Source: [tools/BashTool/BashTool.tsx](../../../../../tools/BashTool/BashTool.tsx
 - iterate`runShellCommand` generator
 - For progressive results, call `onProgress` callback to render the progresses to the caller (UI)
 - Process the final result
-- Keep only the specified maximum length of  `stdout` to avoid the oversized outcome
 - Inspect and normalize the error code and error message from the the exit code. some of non-zero exit code doesn't mean error.
+- Non-interrupted error raises the exception.
+- Keep only the specified maximum length of  `stdout` to avoid the oversized outcome
 - If current agent is the main agent, reset the working directory to the original one in case it has been changed by the bash execution.
 - If the result contains associated output file path (result size is large),  link/copy the file to the dedicated project scope tool-result path. if the result size is larger than 64MB, truncate the file to 64MB size.
-- Non-interrupted error raises the exception.
 - If `stdout` is an image, resize the image with an appropriate size.
-  - This is for the case where bash command output base64 based image directly.
-  - For the case that persist the image into the file. LLM can use `FileReadTool` to load this image later on.
-
+  - This is when the bash command outputs base64 based image directly.
+  - For the case persisting the image into the file, the LLM can use `FileReadTool` to load this image later on.
 - return
 
 
