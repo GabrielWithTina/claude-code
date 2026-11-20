@@ -2,9 +2,24 @@
 
 ## Purpose
 
-The permission system governs every tool call: it decides whether a call is allowed automatically, requires user confirmation, or is denied outright. The design separates static rule evaluation (cheap, synchronous) from interactive and ML-classifier paths (expensive, async) so the common fast path — a pre-approved rule or bypass mode — returns immediately without touching the UI or making API requests.
+The permission system governs every tool call: it decides whether a call is allowed automatically, requires user confirmation, or is denied outright. **The design separates static rule evaluation (cheap, synchronous) from interactive and ML-classifier paths (expensive, async) so the common fast path — a pre-approved rule or bypass mode — returns immediately without touching the UI or making API requests.**
 
 ---
+
+## Permission Modes - Copy from [official document](https://code.claude.com/docs/en/permissions#permission-modes)
+
+| Mode                | Description                                                  |
+| :------------------ | :----------------------------------------------------------- |
+| `default`           | **Prompts before most edits, shell commands, and network requests.** Labeled Manual in the CLI, the VS Code and JetBrains extensions, and the desktop app, and Claude Code accepts `manual` as an alias |
+| `acceptEdits`       | Automatically accepts file edits and common filesystem commands such as `mkdir`, `touch`, `mv`, and `cp` for paths **in the working directory or `additionalDirectories`** |
+| `plan`              | **Claude reads files and runs read-only shell commands to explore but doesn’t edit your source files; with [auto mode](https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode) available, classifier-approved commands also run.** Labeled Plan in the CLI and the VS Code extension |
+| `auto`              | **Runs without routine prompts;** before actions such as shell commands and network requests run, a background [classifier](https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode) checks that they align with your request |
+| `dontAsk`           | **Auto-denies every call that would otherwise prompt,** though in [some setups](https://code.claude.com/docs/en/permissions#precedence-among-rules-hooks-and-mods) a [mod](https://code.claude.com/docs/en/plugins/mods/overview) you installed can still approve some of those calls. File reads in your working directories and other actions that need no approval still run, as do tools pre-approved via `/permissions` or `permissions.allow` rules. `AskUserQuestion` and [some other calls](https://code.claude.com/docs/en/permission-modes#allow-only-pre-approved-tools-with-dontask-mode) are denied even if you’ve allowed them |
+| `bypassPermissions` | Skips permission prompts, except for the [actions no mode auto-approves](https://code.claude.com/docs/en/permission-modes#actions-no-mode-auto-approves) |
+
+
+
+In `bypassPermissions` mode, Claude Code skips permission prompts, including for writes to [protected paths](https://code.claude.com/docs/en/permission-modes#protected-paths) such as `.git` and `.claude`. The [cross-session messaging safeguards](https://code.claude.com/docs/en/permission-modes#skip-all-checks-with-bypasspermissions-mode) still apply. **Only use this mode in isolated environments like containers or VMs where Claude Code can’t cause damage.**
 
 ## Permission Modes
 
@@ -14,13 +29,15 @@ There are five user-addressable modes and two internal-only modes.
 |---|---|
 | `default` | Interactive. Prompts the user for each new tool/pattern not covered by an explicit allow rule. |
 | `acceptEdits` | Auto-approves file edits within the working directory; everything else prompts. |
-| `bypassPermissions` | Skips all permission checks except deny rules, explicit ask rules, and safety-check paths. Intended for fully trusted, sandboxed contexts. |
+| `bypassPermissions` | Skips all permission checks **except deny rules, explicit ask rules, and safety-check paths.** Intended for fully trusted, sandboxed contexts. |
 | `dontAsk` | Converts every `ask` decision to `deny`. The model can only use tools already explicitly allowed. |
 | `plan` | Read-only planning phase. When the user entered plan mode from `bypassPermissions`, `isBypassPermissionsModeAvailable` is set so the original mode can be restored on exit. |
 | `auto` *(internal, TRANSCRIPT_CLASSIFIER flag)* | ML classifier path. The YOLO classifier evaluates each `ask` decision and either auto-approves or blocks without prompting. |
 | `bubble` *(internal)* | Coordinator sub-mode; bubbles permission decisions up to the parent agent. |
 
 ---
+
+
 
 ## `ToolPermissionContext`
 

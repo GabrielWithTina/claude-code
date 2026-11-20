@@ -100,7 +100,7 @@ sequenceDiagram
     end
 ```
 
-## 1. Prompt recognition (`LocalShellTask.tsx:23-43`)
+## 1. Shell Prompt recognition (`LocalShellTask.tsx:23-43`)
 
 Constants set a five-second stall check, 45-second inactivity threshold, and
 1,024-byte tail sample. `looksLikePrompt()` trims trailing whitespace, selects
@@ -206,7 +206,7 @@ The Ctrl+B handler reaches this helper through `BackgroundHint`; it does not
 call Bash's `startBackgrounding()` or directly resolve Bash's progress signal.
 The generator normally wakes on output polling and observes wrapper status.
 
-## 8. Automatic conversion of an existing record (`420-473`)
+## 8. Automatic conversion of an existing foreground task(`420-473`)
 
 `backgroundExistingForegroundTask()` attempts the wrapper transition first and
 returns `false` if it fails. Only afterward does it update application state,

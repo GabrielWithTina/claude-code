@@ -1,5 +1,18 @@
 # Runtime task implementations
 
+## IMHO - Comprehensive task design approach
+
+**The task management includes:**
+
+- **Register a task (foreground or background)**
+- **transit a foreground task to a background if applicable**
+- **Enable a watchdog to monitor the liveness of the associated task**
+- **Notify completeness of a specific task**
+- **Notify the progressive events of a specific task**
+- **Kill a specific task**
+
+
+
 ## Purpose and reading model
 
 This collection documents root-level `Task.ts`, `tasks.ts`, and the recovered
